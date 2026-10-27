@@ -12,6 +12,7 @@ import unicodedata
 import urllib.request
 import uuid
 from pathlib import Path
+from media_tools import ffmpeg_available
 
 from flask import Flask, jsonify, render_template_string, request, send_file, abort
 
@@ -59,14 +60,14 @@ def character_records():
     cast = json.loads(cast_path.read_text(encoding="utf-8")) if cast_path.exists() else {}
     job_names = {"doctor": "Bác sĩ", "chef": "Đầu bếp", "police": "Công an", "artist": "Họa sĩ",
                  "office": "Nhân viên văn phòng", "teacher": "Giáo viên", "engineer": "Kỹ sư", "farmer": "Nông dân", "daoist": "Đạo sĩ"}
-    kind_names = {"human": "Người", "dog": "Chó", "cat": "Mèo", "crocodile": "Cá sấu", "ghost": "Ma"}
+    kind_names = {"human": "Người", "dog": "Chó", "cat": "Mèo", "crocodile": "Cá sấu", "ghost": "Ma", "corpse": "Thi thể"}
     records = []
     for cid, spec in cast.items():
         folder = ROOT / "assets" / "characters" / cid
         if (folder / "neutral.png").exists():
             records.append({"id": cid, "name": spec.get("name", cid.replace("_", " ").title()),
                             "gender": spec.get("gender", "nam"), "age": spec.get("age", ""),
-                            "kind": kind_names.get(spec.get("kind", "human"), "Người"),
+                            "kind": kind_names.get(spec.get("kind", "human"), "Người"), "kind_id": spec.get("kind", "human"), "pose": spec.get("pose", "lying_left" if spec.get("kind") == "corpse" else "standing"),
                             "job": job_names.get(spec.get("job", ""), ""), "description": spec.get("description", ""),
                             "image": f"/api/characters/{cid}/image"})
     return records
@@ -112,7 +113,7 @@ body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 
 .backgrounds-section{display:none;margin-top:20px;padding:26px}.background-form{display:grid;gap:13px;max-width:760px;margin-top:20px}.background-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#e0d0c8}.background-form input,.background-form textarea{width:100%;border:1px solid #493640;border-radius:10px;background:#120e16;color:#f1e8e1;padding:12px;outline:none}.background-form input{height:43px}.background-form textarea{height:110px;resize:vertical}.background-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:24px}.background-card{overflow:hidden;border:1px solid #493640;border-radius:13px;background:#17121a}.background-card img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}.background-card>div{padding:13px}.background-card b{color:#f1e7df}.background-card p{min-height:48px;color:#b9a6a0;font-size:11px;line-height:1.5}.background-card .btn{width:100%}.background-actions{display:flex;gap:7px;margin-top:9px}.background-actions .btn{flex:1;padding:9px 8px}.background-actions .danger{color:#ef9a91}.scene-row{grid-template-columns:34px minmax(150px,1fr) 120px 155px}.scene-row select{min-width:0}@media(max-width:700px){.scene-row{grid-template-columns:28px 1fr 1fr}.scene-row textarea{grid-column:2/-1}.scene-row select{grid-row:2}.scene-row select:last-child{grid-column:3}.background-form{grid-template-columns:1fr}}
 body.backgrounds-active .content>.heading,body.backgrounds-active .content>.workspace,body.backgrounds-active .content>#storyboard,body.backgrounds-active .content>#characters,body.backgrounds-active .content>#aiSettings{display:none!important}body.backgrounds-active .content>#backgrounds{display:block}
-</style></head><body class="video-active"><div class="layout"><aside class="side"><div class="brand"><div class="brandmark">▶</div><div>story studio<small>TRUYỆN THÀNH PHIM</small></div></div><div><div class="nav-label">Không gian làm việc</div><nav class="nav"><button class="active" data-tab="video" onclick="switchTab('video')"><span class="ico">&#10024;</span><span>T&#7841;o video</span></button><button onclick="loadDemo()"><span class="ico">▤</span><span>Dự án mẫu</span></button><button data-tab="characters" onclick="switchTab('characters')"><span class="ico">&#9819;</span><span>Nh&#226;n v&#7853;t</span></button><button data-tab="backgrounds" onclick="switchTab('backgrounds')"><span class="ico">&#127756;</span><span>B&#7889;i c&#7843;nh</span></button><button data-tab="settings" onclick="switchTab('settings')"><span class="ico">&#9881;</span><span>C&#224;i &#273;&#7863;t AI</span></button><button onclick="switchTab('video');setTimeout(()=>document.getElementById('storyboard').scrollIntoView({behavior:'smooth'}),80)"><span class="ico">&#9775;</span><span>Storyboard</span></button><button onclick="switchTab('video');setTimeout(()=>document.getElementById('preview').scrollIntoView({behavior:'smooth'}),80)"><span class="ico">◉</span><span>Video đã xuất</span></button></nav></div><div class="project"><b>✦ &nbsp;Từ câu chuyện đến khung hình</b><p>Biến những câu chuyện của bạn thành phim hoạt hình có giọng đọc và phụ đề.</p></div></aside><main class="main"><header class="topbar"><div class="crumb">Dự án <span style="color:#c3c8c0">/</span> <b>Tạo video mới</b></div><button id="tabJump" data-tab="quick" class="tab-jump" onclick="switchTab(document.body.classList.contains('video-active')?'characters':'video')">&#9819; &nbsp;Nh&#226;n v&#7853;t</button><button class="tab-jump" data-tab="settings" onclick="switchTab('settings')">&#9881; &nbsp;C&#224;i &#273;&#7863;t AI</button><div class="status"><i class="dot"></i> Mọi thay đổi đã lưu</div></header><div class="content"><section class="heading"><div><div class="eyebrow">Story to video · studio</div><h1>Biến câu chuyện thành phim.</h1><p>Viết một câu chuyện. Để những khung hình đầu tiên xuất hiện.</p></div><div class="stepper"><span class="step on"><i>1</i> Câu chuyện</span><span class="sep">···</span><span class="step"><i>2</i> Storyboard</span><span class="sep">···</span><span class="step"><i>3</i> Video</span></div></section><section class="workspace"><div class="card input-card"><div class="card-title"><h2>Câu chuyện của bạn</h2><span class="hint">01 / 03</span></div><label class="label" for="title">Tên dự án <span>Tùy chọn</span></label><input id="title" class="title-input" placeholder="Ví dụ: Tiếng gõ cửa lúc ba giờ sáng"><label class="label" for="story">Nội dung truyện <span id="wordCount">0 từ</span></label><textarea id="story" placeholder="Ngày xửa ngày xưa, ở một ngôi làng nhỏ..."></textarea><div class="toolbar"><span>Hãy để trí tưởng tượng dẫn lối</span><div class="examples"><button onclick="loadSample()">✦ Dùng truyện mẫu</button><button onclick="document.getElementById('file').click()">↥ Tải tệp .txt</button><input id="file" class="hidden" type="file" accept=".txt,text/plain"></div></div><div class="actions"><button class="btn btn-primary" id="generate" onclick="generate()">✦ &nbsp;Phân tích & tạo storyboard <span>→</span></button></div><button class="btn btn-secondary" style="width:100%;margin-top:9px" onclick="renderDemo()">▶ &nbsp;Xem video mẫu</button><div id="progress" class="progress"><div class="progress-track"><div id="bar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Đang xử lý...</div></div></div><div class="right"><div class="card preview" id="preview"><div class="preview-head"><b>Khung hình xem trước</b><span class="hint" id="previewLabel">SẴN SÀNG</span></div><div class="preview-stage" id="stage"><div class="placeholder"><div class="clapper">🎬</div><b>Chuyện của bạn bắt đầu từ đây</b><small>Video xem trước sẽ xuất hiện tại đây</small></div></div><div class="preview-foot"><small>Hoạt hình 2D · Phụ đề tiếng Việt</small><span class="duration" id="duration">--:--</span></div></div><div class="card details"><h3>Thiết lập video</h3><div class="chips"><span class="chip">🎨 &nbsp;<strong>Hoạt hình 2D</strong></span><span class="chip">📐 &nbsp;<strong>16:9 · HD</strong></span><span class="chip">💬 &nbsp;<strong>Phụ đề tự động</strong></span></div><div class="voice"><span>Giọng kể</span><b>Tiếng Việt · Tự nhiên</b></div></div><div class="tip"><strong>✦ Mẹo nhỏ</strong><br>Mỗi câu chuyện sẽ được chia thành các cảnh ngắn. Bạn có thể chỉnh lời thoại, nhân vật và bối cảnh trước khi xuất video.</div></div></section><section id="characters" class="card characters-section"><div class="eyebrow">Th&#432; vi&#7879;n t&#224;i s&#7843;n</div><div class="char-create"><h3>Nh&#226;n v&#7853;t c&#7911;a b&#7841;n</h3><button class="btn btn-secondary" onclick="refreshCharacters()">&#8635; &nbsp;L&#224;m m&#7899;i</button></div><div class="hint">T&#7841;o nh&#226;n v&#7853;t ho&#7841;t h&#236;nh 2D v&#7899;i b&#7897; bi&#7875;u c&#7843;m v&#224; mi&#7879;ng &#273;&#7897;ng t&#7921; &#273;&#7897;ng.</div><div id="characterList" class="character-list"></div><div style="border-top:1px solid var(--line);margin-top:20px;padding-top:17px"><h3 style="font:700 14px Manrope;margin:0 0 13px">&#65291; T&#7841;o nh&#226;n v&#7853;t m&#7899;i</h3><div class="character-form"><label>T&#234;n nh&#226;n v&#7853;t<input id="charName" placeholder="V&#237; d&#7909;: Mai"></label><label>Lo&#7841;i nh&#226;n v&#7853;t<select id="charKind"><option value="human">Ng&#432;&#7901;i</option><option value="dog">Ch&#243;</option><option value="cat">M&#232;o</option><option value="crocodile">C&#225; s&#7845;u</option><option value="ghost">Ma</option></select></label><label>Gi&#7899;i t&#237;nh<select id="charGender"><option value="nu">N&#7919;</option><option value="nam">Nam</option></select></label><label id="jobField">Ngh&#7873; nghi&#7879;p<select id="charJob"><option value="none">Kh&#244;ng ch&#7885;n</option><option value="doctor">B&#225;c s&#297;</option><option value="chef">&#272;&#7847;u b&#7871;p</option><option value="police">C&#244;ng an</option><option value="artist">H&#7885;a s&#297;</option><option value="office">V&#259;n ph&#242;ng</option><option value="teacher">Gi&#225;o vi&#234;n</option><option value="engineer">K&#7929; s&#432;</option><option value="farmer">N&#244;ng d&#226;n</option><option value="daoist">&#272;&#7841;o s&#297;</option></select></label><label>&#272;&#7897; tu&#7893;i<input id="charAge" type="number" min="1" max="120" value="25" placeholder="Tu&#7893;i"></label><label>M&#224;u da<input id="charSkin" type="color" value="#f1c296"></label><label>M&#224;u t&#243;c<input id="charHair" type="color" value="#1e1e23"></label><label>M&#224;u &#225;o<input id="charShirt" type="color" value="#4670aa"></label><label id="hairStyleField">Ki&#7875;u t&#243;c<select id="charStyle"><option value="long">T&#243;c d&#224;i</option><option value="bun">T&#243;c b&#250;i</option><option value="bob">T&#243;c bob</option><option value="ponytail">T&#243;c bu&#7897;c &#273;u&#244;i ng&#7921;a</option><option value="curly">T&#243;c xo&#259;n</option><option value="spiky">T&#243;c d&#7921;ng</option><option value="short">T&#243;c ng&#7855;n</option><option value="side">R&#7869; ng&#244;i</option><option value="bald_top">H&#243;i &#273;&#7881;nh &#273;&#7847;u</option></select></label><label class="wide">M&#244; t&#7843; th&#234;m<input id="charDescription" placeholder="V&#237; d&#7909;: c&#244; b&#233; vui v&#7867;, th&#237;ch kh&#225;m ph&#225;"></label></div><button id="createCharacter" class="btn btn-primary" style="margin-top:13px" onclick="createCharacter()">&#10024; &nbsp;T&#7841;o b&#7897; nh&#226;n v&#7853;t</button></div></section><section id="aiSettings" class="card settings-section"><div class="eyebrow">K&#7871;t n&#7889;i AI</div><h2 style="font:800 22px Manrope;margin:7px 0">C&#224;i &#273;&#7863;t API</h2><p class="hint">Nh&#7853;p API key &#273;&#7875; AI ph&#226;n t&#237;ch truy&#7879;n, t&#225;ch l&#7901;i nh&#226;n v&#7853;t v&#224; l&#7901;i k&#7875;.</p><div class="settings-form"><label>Nh&#224; cung c&#7845;p<select id="aiProvider" onchange="providerChanged()"><option value="muse">Meta Muse / Muse Spark</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama (ch&#7841;y tr&#234;n m&#225;y)</option><option value="huggingface">Hugging Face Inference</option></select></label><label>Model<input id="aiModel" value="muse-spark-1.3"></label><label id="apiKeyField" class="wide">API key<input id="aiKey" type="password" autocomplete="new-password" placeholder="Ch&#432;a c&#243; key &#273;&#432;&#7907;c l&#432;u"></label><label id="ollamaField" class="wide hidden">&#272;&#7883;a ch&#7881; Ollama<input id="ollamaBase" value="http://localhost:11434" placeholder="http://localhost:11434"></label></div><div class="settings-actions"><button class="btn btn-primary" onclick="saveAISettings()">L&#432;u API key</button><button class="btn btn-secondary" onclick="testAISettings()">Ki&#7875;m tra k&#7871;t n&#7889;i</button><button class="btn btn-secondary danger" onclick="clearAISettings()">X&#243;a key &#273;&#227; l&#432;u</button></div><div id="aiSettingsStatus" class="settings-status" role="status">Ch&#432;a c&#7845;u h&#236;nh API.</div><div class="settings-note">API key ho&#7863;c &#273;&#7883;a ch&#7881; Ollama &#273;&#432;&#7907;c l&#432;u trong <code>local_settings.json</code> tr&#234;n m&#225;y n&#224;y. Ollama ch&#7841;y local kh&#244;ng c&#7847;n key.</div></section><section id="backgrounds" class="card backgrounds-section"><div class="eyebrow">TH&#7870; GI&#7898;I C&#7910;A C&#194;U CHUY&#7878;N</div><h2 style="font:800 22px Manrope;margin:7px 0">Th&#432; vi&#7879;n b&#7889;i c&#7843;nh</h2><p class="hint">Vi&#7871;t t&#234;n v&#224; m&#244; t&#7843; khung c&#7843;nh. B&#7843;n v&#7869; minh h&#7885;a 2D s&#7869; &#273;&#432;&#7907;c t&#7841;o v&#224; l&#432;u &#273;&#7875; ch&#7885;n trong storyboard.</p><div class="background-form"><label>T&#234;n b&#7889;i c&#7843;nh<input id="bgName" maxlength="60" placeholder="V&#237; d&#7909;: B&#7871;n &#273;&#242; l&#250;c n&#7917;a &#273;&#234;m"></label><label>M&#244; t&#7843; khung c&#7843;nh<textarea id="bgDescription" maxlength="400" placeholder="V&#237; d&#7909;: b&#7871;n c&#7847;u g&#7895; c&#361; b&#234;n d&#242;ng s&#244;ng, s&#432;&#417;ng m&#249;, &#273;&#232;n l&#7891;ng v&#224;ng, phong c&#225;ch ho&#7841;t h&#236;nh 2D"></textarea></label></div><button id="saveBackground" class="btn btn-primary" style="margin-top:13px" onclick="saveBackground()">&#10024; &nbsp;L&#432;u m&#244; t&#7843; v&#224; v&#7869; b&#7889;i c&#7843;nh</button><div id="backgroundList" class="background-list"></div></section><section id="storyboard" class="card storyboard"><div class="scenes-top"><div><div class="eyebrow">Bước 02</div><h2 style="font:700 19px Manrope;margin:5px 0">Storyboard của bạn</h2><span class="hint" id="sceneCount"></span></div><button class="btn btn-primary" style="flex:0 0 auto" onclick="renderStory()">▶ &nbsp;Tạo video</button></div><div id="sceneList"></div></section></div></main></div><div id="toast" class="toast"></div>
+</style></head><body class="video-active"><div class="layout"><aside class="side"><div class="brand"><div class="brandmark">▶</div><div>story studio<small>TRUYỆN THÀNH PHIM</small></div></div><div><div class="nav-label">Không gian làm việc</div><nav class="nav"><button class="active" data-tab="video" onclick="switchTab('video')"><span class="ico">&#10024;</span><span>T&#7841;o video</span></button><button onclick="openProjects()"><span class="ico">▤</span><span>Dự án đã lưu</span></button><button data-tab="characters" onclick="switchTab('characters')"><span class="ico">&#9819;</span><span>Nh&#226;n v&#7853;t</span></button><button data-tab="backgrounds" onclick="switchTab('backgrounds')"><span class="ico">&#127756;</span><span>B&#7889;i c&#7843;nh</span></button><button data-tab="settings" onclick="switchTab('settings')"><span class="ico">&#9881;</span><span>C&#224;i &#273;&#7863;t AI</span></button><button onclick="switchTab('video');setTimeout(()=>document.getElementById('storyboard').scrollIntoView({behavior:'smooth'}),80)"><span class="ico">&#9775;</span><span>Storyboard</span></button><button onclick="switchTab('video');setTimeout(()=>document.getElementById('preview').scrollIntoView({behavior:'smooth'}),80)"><span class="ico">◉</span><span>Video đã xuất</span></button></nav></div><div class="project"><b>✦ &nbsp;Từ câu chuyện đến khung hình</b><p>Biến những câu chuyện của bạn thành phim hoạt hình có giọng đọc và phụ đề.</p></div></aside><main class="main"><header class="topbar"><div class="crumb">Dự án <span style="color:#c3c8c0">/</span> <b>Tạo video mới</b></div><button id="tabJump" data-tab="quick" class="tab-jump" onclick="switchTab(document.body.classList.contains('video-active')?'characters':'video')">&#9819; &nbsp;Nh&#226;n v&#7853;t</button><button class="tab-jump" data-tab="settings" onclick="switchTab('settings')">&#9881; &nbsp;C&#224;i &#273;&#7863;t AI</button><div class="status"><i class="dot"></i> Mọi thay đổi đã lưu</div></header><div class="content"><div style="display:flex;gap:10px;margin-bottom:18px"><select id="projectPicker" aria-label="Dự án đã lưu" onchange="openSavedProject(this.value)"><option value="">Dự án đã lưu</option></select><button class="btn btn-secondary" onclick="newProject()">＋ Dự án mới</button><button id="deleteProject" class="btn btn-secondary danger" onclick="deleteCurrentProject()" disabled>Xóa dự án</button></div><section class="heading"><div><div class="eyebrow">Story to video · studio</div><h1>Biến câu chuyện thành phim.</h1><p>Viết một câu chuyện. Để những khung hình đầu tiên xuất hiện.</p></div><div class="stepper"><span class="step on"><i>1</i> Câu chuyện</span><span class="sep">···</span><span class="step"><i>2</i> Storyboard</span><span class="sep">···</span><span class="step"><i>3</i> Video</span></div></section><section class="workspace"><div class="card input-card"><div class="card-title"><h2>Câu chuyện của bạn</h2><span class="hint">01 / 03</span></div><label class="label" for="title">Tên dự án <span>Tùy chọn</span></label><input id="title" class="title-input" placeholder="Ví dụ: Tiếng gõ cửa lúc ba giờ sáng"><label class="label" for="story">Nội dung truyện <span id="wordCount">0 từ</span></label><textarea id="story" placeholder="Ngày xửa ngày xưa, ở một ngôi làng nhỏ..."></textarea><div class="toolbar"><span>Hãy để trí tưởng tượng dẫn lối</span><div class="examples"><button onclick="document.getElementById('file').click()">↥ Tải tệp .txt</button><input id="file" class="hidden" type="file" accept=".txt,text/plain"></div></div><div class="actions"><button class="btn btn-primary" id="generate" onclick="generate()">✦ &nbsp;Phân tích & tạo storyboard <span>→</span></button></div><div id="progress" class="progress"><div class="progress-track"><div id="bar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Đang xử lý...</div></div></div><div class="right"><div class="card preview" id="preview"><div class="preview-head"><b>Khung hình xem trước</b><span class="hint" id="previewLabel">SẴN SÀNG</span></div><div class="preview-stage" id="stage"><div class="placeholder"><div class="clapper">🎬</div><b>Chuyện của bạn bắt đầu từ đây</b><small>Video xem trước sẽ xuất hiện tại đây</small></div></div><div class="preview-foot"><small>Hoạt hình 2D · Phụ đề tiếng Việt</small><span class="duration" id="duration">--:--</span></div></div><div class="card details"><h3>Thiết lập video</h3><div class="chips"><span class="chip">🎨 &nbsp;<strong>Hoạt hình 2D</strong></span><span class="chip">📐 &nbsp;<strong>16:9 · HD</strong></span><span class="chip">💬 &nbsp;<strong>Phụ đề tự động</strong></span></div><div style="display:grid;gap:10px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><b>Phụ đề</b><label>Font chữ<select id="subtitleFont" style="width:100%" onchange="previewSubtitles()"></select></label><label>Cỡ chữ (px)<input id="subtitleSize" type="number" min="16" max="96" value="36" style="width:100%" oninput="previewSubtitles()"></label><img id="subtitlePreview" alt="Xem trước phụ đề tiếng Việt" style="width:100%;border-radius:8px"><small>Cỡ chữ áp dụng trên video HD 1280 × 720.</small><button class="btn btn-secondary" onclick="saveSubtitles()">Lưu thiết lập phụ đề</button></div><div style="display:grid;gap:10px;margin-top:16px"><small>Giọng kể truyện ma · Tốc độ 0,9× · Trầm nhẹ · Âm lượng cân bằng</small><label>Giọng kể<select id="narratorVoice" style="width:100%" onchange="saveVoices()"></select></label><label>Giọng nhân vật mặc định<select id="characterVoice" style="width:100%" onchange="saveVoices()"></select></label><div id="speakerVoiceChoices" style="display:grid;gap:10px"></div><small id="voiceNote">Đang tìm giọng đọc trên máy…</small><button class="btn btn-secondary" onclick="previewNarrator(this)">▶ Nghe thử giọng kể</button><audio id="voicePreview" controls style="width:100%;display:none"></audio></div></div><div class="tip"><strong>✦ Mẹo nhỏ</strong><br>Mỗi câu chuyện sẽ được chia thành các cảnh ngắn. Bạn có thể chỉnh lời thoại, nhân vật và bối cảnh trước khi xuất video.</div></div></section><section id="characters" class="card characters-section"><div class="eyebrow">Th&#432; vi&#7879;n t&#224;i s&#7843;n</div><div class="char-create"><h3>Nh&#226;n v&#7853;t c&#7911;a b&#7841;n</h3><button class="btn btn-secondary" onclick="refreshCharacters()">&#8635; &nbsp;L&#224;m m&#7899;i</button></div><div class="hint">T&#7841;o nh&#226;n v&#7853;t ho&#7841;t h&#236;nh 2D v&#7899;i b&#7897; bi&#7875;u c&#7843;m v&#224; mi&#7879;ng &#273;&#7897;ng t&#7921; &#273;&#7897;ng.</div><div id="characterList" class="character-list"></div><div style="border-top:1px solid var(--line);margin-top:20px;padding-top:17px"><h3 style="font:700 14px Manrope;margin:0 0 13px">&#65291; T&#7841;o nh&#226;n v&#7853;t m&#7899;i</h3><div class="character-form"><label>T&#234;n nh&#226;n v&#7853;t<input id="charName" placeholder="V&#237; d&#7909;: Mai"></label><label>Lo&#7841;i nh&#226;n v&#7853;t<select id="charKind"><option value="human">Ng&#432;&#7901;i</option><option value="dog">Ch&#243;</option><option value="cat">M&#232;o</option><option value="crocodile">C&#225; s&#7845;u</option><option value="ghost">Ma</option><option value="corpse">Thi thể</option></select></label><label>Gi&#7899;i t&#237;nh<select id="charGender"><option value="nu">N&#7919;</option><option value="nam">Nam</option></select></label><label id="jobField">Ngh&#7873; nghi&#7879;p<select id="charJob"><option value="none">Kh&#244;ng ch&#7885;n</option><option value="doctor">B&#225;c s&#297;</option><option value="chef">&#272;&#7847;u b&#7871;p</option><option value="police">C&#244;ng an</option><option value="artist">H&#7885;a s&#297;</option><option value="office">V&#259;n ph&#242;ng</option><option value="teacher">Gi&#225;o vi&#234;n</option><option value="engineer">K&#7929; s&#432;</option><option value="farmer">N&#244;ng d&#226;n</option><option value="daoist">&#272;&#7841;o s&#297;</option></select></label><label>&#272;&#7897; tu&#7893;i<input id="charAge" type="number" min="1" max="120" value="25" placeholder="Tu&#7893;i"></label><label>M&#224;u da<input id="charSkin" type="color" value="#f1c296"></label><label>M&#224;u t&#243;c<input id="charHair" type="color" value="#1e1e23"></label><label>M&#224;u &#225;o<input id="charShirt" type="color" value="#4670aa"></label><label id="hairStyleField">Ki&#7875;u t&#243;c<select id="charStyle"><option value="long">T&#243;c d&#224;i</option><option value="bun">T&#243;c b&#250;i</option><option value="bob">T&#243;c bob</option><option value="ponytail">T&#243;c bu&#7897;c &#273;u&#244;i ng&#7921;a</option><option value="curly">T&#243;c xo&#259;n</option><option value="spiky">T&#243;c d&#7921;ng</option><option value="short">T&#243;c ng&#7855;n</option><option value="side">R&#7869; ng&#244;i</option><option value="bald_top">H&#243;i &#273;&#7881;nh &#273;&#7847;u</option></select></label><label>Tư thế mặc định<select id="charPose"><option value="standing">Đứng</option><option value="lying_left">Nằm · đầu bên trái</option><option value="lying_right">Nằm · đầu bên phải</option></select></label><label class="wide">M&#244; t&#7843; th&#234;m<input id="charDescription" placeholder="V&#237; d&#7909;: c&#244; b&#233; vui v&#7867;, th&#237;ch kh&#225;m ph&#225;"></label></div><p class="hint">Nhân vật dưới 12 tuổi có tỷ lệ trẻ em và thấp hơn người lớn khi xuất hiện cùng cảnh.</p><button id="createCharacter" class="btn btn-primary" style="margin-top:13px" onclick="createCharacter()">&#10024; &nbsp;T&#7841;o b&#7897; nh&#226;n v&#7853;t</button></div></section><section id="aiSettings" class="card settings-section"><div class="eyebrow">K&#7871;t n&#7889;i AI</div><h2 style="font:800 22px Manrope;margin:7px 0">C&#224;i &#273;&#7863;t API</h2><p class="hint">Nh&#7853;p API key &#273;&#7875; AI ph&#226;n t&#237;ch truy&#7879;n, t&#225;ch l&#7901;i nh&#226;n v&#7853;t v&#224; l&#7901;i k&#7875;.</p><div class="settings-form"><label>Nh&#224; cung c&#7845;p<select id="aiProvider" onchange="providerChanged()"><option value="muse">Meta Muse / Muse Spark</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama (ch&#7841;y tr&#234;n m&#225;y)</option><option value="huggingface">Hugging Face Inference</option></select></label><label>Model<input id="aiModel" value="muse-spark-1.3"></label><label id="apiKeyField" class="wide">API key<input id="aiKey" type="password" autocomplete="new-password" placeholder="Ch&#432;a c&#243; key &#273;&#432;&#7907;c l&#432;u"></label><label id="ollamaField" class="wide hidden">&#272;&#7883;a ch&#7881; Ollama<input id="ollamaBase" value="http://localhost:11434" placeholder="http://localhost:11434"></label></div><div class="settings-actions"><button class="btn btn-primary" onclick="saveAISettings()">L&#432;u API key</button><button class="btn btn-secondary" onclick="testAISettings()">Ki&#7875;m tra k&#7871;t n&#7889;i</button><button class="btn btn-secondary danger" onclick="clearAISettings()">X&#243;a key &#273;&#227; l&#432;u</button></div><div id="aiSettingsStatus" class="settings-status" role="status">Ch&#432;a c&#7845;u h&#236;nh API.</div><div class="settings-note">API key ho&#7863;c &#273;&#7883;a ch&#7881; Ollama &#273;&#432;&#7907;c l&#432;u trong <code>local_settings.json</code> tr&#234;n m&#225;y n&#224;y. Ollama ch&#7841;y local kh&#244;ng c&#7847;n key.</div></section><section id="backgrounds" class="card backgrounds-section"><div class="eyebrow">TH&#7870; GI&#7898;I C&#7910;A C&#194;U CHUY&#7878;N</div><h2 style="font:800 22px Manrope;margin:7px 0">Th&#432; vi&#7879;n b&#7889;i c&#7843;nh</h2><p class="hint">Vi&#7871;t t&#234;n v&#224; m&#244; t&#7843; khung c&#7843;nh. B&#7843;n v&#7869; minh h&#7885;a 2D s&#7869; &#273;&#432;&#7907;c t&#7841;o v&#224; l&#432;u &#273;&#7875; ch&#7885;n trong storyboard.</p><div class="background-form"><label>T&#234;n b&#7889;i c&#7843;nh<input id="bgName" maxlength="60" placeholder="V&#237; d&#7909;: B&#7871;n &#273;&#242; l&#250;c n&#7917;a &#273;&#234;m"></label><label>M&#244; t&#7843; khung c&#7843;nh<textarea id="bgDescription" maxlength="400" placeholder="V&#237; d&#7909;: b&#7871;n c&#7847;u g&#7895; c&#361; b&#234;n d&#242;ng s&#244;ng, s&#432;&#417;ng m&#249;, &#273;&#232;n l&#7891;ng v&#224;ng, phong c&#225;ch ho&#7841;t h&#236;nh 2D"></textarea></label></div><button id="saveBackground" class="btn btn-primary" style="margin-top:13px" onclick="saveBackground()">&#10024; &nbsp;L&#432;u m&#244; t&#7843; v&#224; v&#7869; b&#7889;i c&#7843;nh</button><div id="backgroundList" class="background-list"></div></section><section id="storyboard" class="card storyboard"><div class="scenes-top"><div><div class="eyebrow">Bước 02</div><h2 style="font:700 19px Manrope;margin:5px 0">Storyboard của bạn</h2><span class="hint" id="sceneCount"></span></div><button class="btn btn-primary" style="flex:0 0 auto" onclick="renderStory()">▶ &nbsp;Tạo video</button></div><button class="btn btn-secondary" style="margin:10px 0" onclick="matchBackgrounds(this)">✦ Khớp bối cảnh theo truyện</button><button class="btn btn-secondary" style="margin:10px" onclick="matchCharacters(this)">♙ Nhận diện nhân vật theo câu văn</button><button class="btn btn-primary" style="margin:10px" onclick="generateAIBackgrounds(this)">🎨 Tạo nền AI local</button><p class="hint">Stable Diffusion 1.5 · Chạy trên máy · Ảnh được lưu để dùng lại. Lần đầu cần thời gian nạp model.</p><div id="sceneList"></div></section></div></main></div><div id="toast" class="toast"></div>
 <script>
 const $=s=>document.querySelector(s), story=$('#story');let scenes=[], characterRecords=[],backgroundRecords=[];refreshCharacters();refreshBackgrounds();$('#charKind').addEventListener('change',updateKindFields);updateKindFields();story.addEventListener('input',()=>$('#wordCount').textContent=(story.value.trim()?story.value.trim().split(/\s+/).length:0)+' từ');
 function toast(t){let e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3300)}
@@ -122,36 +123,363 @@ async function loadAISettings(){try{let r=await fetch('/api/settings'),d=await r
 async function saveAISettings(){try{let r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:$('#aiProvider').value,model:$('#aiModel').value,api_key:$('#aiKey').value,base_url:$('#ollamaBase').value})}),d=await r.json();if(!r.ok)throw Error(d.error);$('#aiKey').value='';await loadAISettings();$('#aiSettingsStatus').textContent=d.provider==='ollama'?'Da luu may chu Ollama cuc bo.':'Da luu. Key duoc giu rieng tren may nay.';toast('Da luu cai dat AI.');return true}catch(e){$('#aiSettingsStatus').textContent=e.message;toast(e.message);return false}}
 async function testAISettings(){if(!await saveAISettings())return;try{let r=await fetch('/api/settings/test',{method:'POST'}),d=await r.json();if(!r.ok)throw Error(d.error);$('#aiSettingsStatus').textContent=d.message;toast(d.message)}catch(e){$('#aiSettingsStatus').textContent=e.message;toast(e.message)}}
 async function clearAISettings(){if(!confirm('Xoa API key da luu tren may nay?'))return;try{let r=await fetch('/api/settings',{method:'DELETE'}),d=await r.json();if(!r.ok)throw Error(d.error);$('#aiKey').value='';await loadAISettings();toast('Da xoa API key da luu.')}catch(e){toast(e.message)}}
-function loadDemo(){switchTab('video');loadSample();setTimeout(()=>$('#storyboard').scrollIntoView({behavior:'smooth'}),100)}
 $('#file').addEventListener('change',async e=>{let f=e.target.files[0];if(f){story.value=await f.text();$('#title').value=f.name.replace(/\.txt$/i,'');story.dispatchEvent(new Event('input'))}});
-async function generate(){if(story.value.trim().length<30){toast('Hãy nhập câu chuyện dài hơn một chút nhé.');story.focus();return}let b=$('#generate');b.disabled=true;b.textContent='Đang phân tích câu chuyện…';showProgress('Đang chia câu chuyện thành các cảnh…');try{let r=await fetch('/api/storyboard',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story:story.value,title:$('#title').value})});let d=await r.json();if(!r.ok)throw Error(d.error);scenes=d.scenes;renderScenes();$('#storyboard').classList.add('show');$('#sceneCount').textContent=scenes.length+' cảnh · Bạn có thể chỉnh sửa trước khi tạo video';$('#storyboard').scrollIntoView({behavior:'smooth'});$('#progress').classList.remove('show');toast(d.message||'Storyboard đã sẵn sàng.')}catch(e){toast(e.message)}finally{b.disabled=false;b.innerHTML='✦ &nbsp;Phân tích & tạo storyboard <span>→</span>'}}
-function renderScenes(){let list=$('#sceneList');list.innerHTML='';scenes.forEach((s,i)=>{let row=document.createElement('div');row.className='scene-row';let n=document.createElement('div');n.className='scene-num';n.textContent=String(i+1).padStart(2,'0');let t=document.createElement('textarea');t.value=s.text;t.setAttribute('aria-label','L?i tho?i c?nh '+(i+1));t.oninput=()=>scenes[i].text=t.value;let speaker=document.createElement('select');['narrator',...new Set([...characterRecords.map(x=>x.id),...scenes.map(x=>x.speaker).filter(x=>x!=='narrator')])].forEach(v=>{let o=document.createElement('option');o.value=v;o.textContent=v==='narrator'?'Ng??i k?':v;o.selected=v===s.speaker;speaker.append(o)});speaker.onchange=()=>scenes[i].speaker=speaker.value;let bg=document.createElement('select');backgroundRecords.forEach(v=>{let o=document.createElement('option');o.value=v.id;o.textContent=v.name;o.selected=v.id===s.background;bg.append(o)});if(!backgroundRecords.some(v=>v.id===s.background)){let o=document.createElement('option');o.value=s.background;o.textContent=s.background;o.selected=true;bg.append(o)}bg.setAttribute('aria-label','B?i c?nh c?nh '+(i+1));bg.onchange=()=>scenes[i].background=bg.value;row.append(n,t,speaker,bg);list.append(row)})}
+async function generate(){if(story.value.trim().length<30){toast('Hãy nhập câu chuyện dài hơn một chút nhé.');story.focus();return}let b=$('#generate');b.disabled=true;b.textContent='Đang phân tích câu chuyện…';showProgress('Đang chia câu chuyện thành các cảnh…');try{let r=await fetch('/api/storyboard',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story:story.value,title:$('#title').value,project:window.currentProject})});let d=await r.json();if(!r.ok)throw Error(d.error);window.currentProject=d.project;scenes=d.scenes;refreshProjectPicker();window.storyCharacters=d.characters||[];window.storyBackgrounds=d.backgrounds||[];renderScenes();renderSpeakerVoices();$('#storyboard').classList.add('show');$('#sceneCount').textContent=scenes.length+' cảnh · Bạn có thể chỉnh sửa trước khi tạo video';$('#storyboard').scrollIntoView({behavior:'smooth'});$('#progress').classList.remove('show');toast(d.message||'Storyboard đã sẵn sàng.')}catch(e){toast(e.message)}finally{b.disabled=false;b.innerHTML='✦ &nbsp;Phân tích & tạo storyboard <span>→</span>'}}
+function renderScenes(){let list=$('#sceneList');list.innerHTML='';scenes.forEach((s,i)=>{let row=document.createElement('div');row.className='scene-row';let n=document.createElement('div');n.className='scene-num';n.textContent=String(i+1).padStart(2,'0');let t=document.createElement('textarea');t.value=s.text;t.setAttribute('aria-label','Lời thoại cảnh '+(i+1));t.oninput=()=>scenes[i].text=t.value;let speaker=document.createElement('select');['narrator',...new Set([...characterRecords.map(x=>x.id),...(window.storyCharacters||[]).map(x=>x.id),...scenes.map(x=>x.speaker).filter(x=>x!=='narrator')])].forEach(v=>{let o=document.createElement('option');o.value=v;o.textContent=v==='narrator'?'Người kể':(characterRecords.find(c=>c.id===v)?.name||(window.storyCharacters||[]).find(c=>c.id===v)?.name||v);o.selected=v===s.speaker;speaker.append(o)});speaker.onchange=()=>scenes[i].speaker=speaker.value;let sceneBackgrounds=[...(window.storyBackgrounds||[]),...backgroundRecords.filter(b=>!(window.storyBackgrounds||[]).some(x=>x.id===b.id))];let bg=document.createElement('select');sceneBackgrounds.forEach(v=>{let o=document.createElement('option');o.value=v.id;o.textContent=v.name||v.description||v.id;o.selected=v.id===s.background;bg.append(o)});if(!sceneBackgrounds.some(v=>v.id===s.background)){let o=document.createElement('option');o.value=s.background;o.textContent=s.background;o.selected=true;bg.append(o)}bg.setAttribute('aria-label','Bối cảnh cảnh '+(i+1));let group=document.createElement('div');group.style='display:grid;gap:7px';let image=document.createElement('img');image.style='width:100%;max-height:100px;object-fit:cover;border-radius:6px';image.alt='Bối cảnh cảnh '+(i+1);let description=document.createElement('textarea');description.style='min-height:64px;font-size:11px';description.placeholder='Mô tả địa điểm, ánh sáng…';description.setAttribute('aria-label','Mô tả bối cảnh cảnh '+(i+1));function syncBackground(){let record=sceneBackgrounds.find(b=>b.id===s.background);description.value=s.background_description||record?.description||'';image.src=(window.storyBackgrounds||[]).some(b=>b.id===s.background)?'/projects/'+encodeURIComponent(window.currentProject)+'/backgrounds/'+encodeURIComponent(s.background)+'/image?t='+Date.now():'/api/backgrounds/'+encodeURIComponent(s.background)+'/image'}bg.onchange=()=>{s.background=bg.value;delete s.background_description;syncBackground()};description.oninput=()=>s.background_description=description.value;image.onerror=()=>image.style.display='none';syncBackground();group.append(bg,image,description);let people=document.createElement('div');people.style='display:grid;gap:8px';let details=document.createElement('details');let summary=document.createElement('summary');summary.textContent='Nhân vật xuất hiện';details.append(summary);let choices=[...characterRecords,...(window.storyCharacters||[]).filter(c=>!characterRecords.some(x=>x.id===c.id))];for(let character of choices){let entry=document.createElement('div');entry.style='display:grid;gap:4px;margin:8px 0';let label=document.createElement('label');let check=document.createElement('input');check.type='checkbox';check.style.width='auto';check.checked=(s.characters||[]).includes(character.id);check.onchange=()=>{s.characters=check.checked?[...new Set([...(s.characters||[]),character.id])]:(s.characters||[]).filter(id=>id!==character.id)};label.append(check,document.createTextNode(' '+character.name));let pose=document.createElement('select');pose.setAttribute('aria-label','Tư thế '+character.name);for(let [value,text] of [['default','Theo nhân vật'],['standing','Đứng'],['lying_left','Nằm · đầu trái'],['lying_right','Nằm · đầu phải']]){let o=document.createElement('option');o.value=value;o.textContent=text;pose.append(o)}pose.value=s.character_poses?.[character.id]||'default';pose.onchange=()=>{s.character_poses=s.character_poses||{};if(pose.value==='default')delete s.character_poses[character.id];else s.character_poses[character.id]=pose.value};entry.append(label,pose);details.append(entry)}let showLabel=document.createElement('label');showLabel.style='font-size:11px';let showSpeaker=document.createElement('input');showSpeaker.type='checkbox';showSpeaker.style.width='auto';showSpeaker.checked=s.speaker!=='narrator'&&s.speaker_visible!==false;showSpeaker.disabled=s.speaker==='narrator';showSpeaker.onchange=()=>s.speaker_visible=showSpeaker.checked;showLabel.append(showSpeaker,document.createTextNode(' Hiện người nói'));speaker.onchange=()=>{s.speaker=speaker.value;s.speaker_visible=true;showSpeaker.disabled=s.speaker==='narrator';showSpeaker.checked=s.speaker!=='narrator'};people.append(speaker,showLabel,details);row.append(n,t,people,group);list.append(row)})}
 function showProgress(text){$('#progress').classList.add('show');$('#progressText').textContent=text;$('#bar').style.width='12%'}
-async function renderStory(){if(!scenes.length)return;showProgress('Đang dựng hoạt hình và tạo giọng đọc…');$('#bar').style.width='15%';try{let r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes,title:$('#title').value})}),d=await r.json();if(!r.ok)throw Error(d.error);poll(d.job)}catch(e){$('#progress').classList.remove('show');toast(e.message)}}
-async function renderDemo(){showProgress('Đang tạo video mẫu…');$('#bar').style.width='15%';try{let r=await fetch('/api/render-demo',{method:'POST'}),d=await r.json();if(!r.ok)throw Error(d.error);poll(d.job)}catch(e){$('#progress').classList.remove('show');toast(e.message)}}
-async function poll(id){let timer=setInterval(async()=>{try{let r=await fetch('/api/jobs/'+id),d=await r.json();$('#progressText').textContent=d.message;$('#bar').style.width=d.done?'100%':Math.min(90,20+d.progress*65)+'%';if(d.done){clearInterval(timer);$('#progress').classList.remove('show');if(d.error){toast(d.error);return}showVideo(d.url);toast('Video của bạn đã sẵn sàng!')}}catch(e){clearInterval(timer);toast('Mất kết nối khi tạo video.')}} ,1800)}
-function showVideo(url){$('#stage').innerHTML='<video controls autoplay playsinline src="'+url+'?t='+Date.now()+'" style="width:100%;height:100%;object-fit:contain;background:#14221d"></video><span class="stage-tag">VIDEO ĐÃ XUẤT</span>';$('#previewLabel').textContent='HOÀN TẤT';$('#duration').textContent='MP4 · HD';let a=document.createElement('a');a.href=url;a.download='video.mp4';a.className='btn btn-secondary';a.style='margin:0 14px 14px;width:calc(100% - 28px)';a.textContent='↓  Tải video MP4';$('#preview').append(a)}
-function updateKindFields(){let human=$('#charKind').value==='human';$('#jobField').classList.toggle('hidden',!human);$('#hairStyleField').classList.toggle('hidden',!human);$('#charHair').closest('label').firstChild.textContent=human?'M\u00e0u t\u00f3c':'M\u00e0u l\u00f4ng / v\u1ea3y';$('#charSkin').closest('label').firstChild.textContent=$('#charKind').value==='ghost'?'M\u00e0u ma':'M\u00e0u da';}
+async function renderStory(){if(!scenes.length)return;showProgress('Đang dựng hoạt hình và tạo giọng đọc…');$('#bar').style.width='15%';try{let r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes,title:$('#title').value,story:story.value,project:window.currentProject,characters:window.storyCharacters||[],subtitles:readSubtitles()})}),d=await r.json();if(!r.ok)throw Error(d.error);window.currentProject=d.project||window.currentProject;refreshProjectPicker();poll(d.job)}catch(e){$('#progress').classList.remove('show');toast(e.message)}}
+async function poll(id){let timer=setInterval(async()=>{try{let r=await fetch('/api/jobs/'+id),d=await r.json();$('#progressText').textContent=d.message;$('#bar').style.width=d.done?'100%':Math.min(90,20+d.progress*65)+'%';if(d.done){clearInterval(timer);$('#progress').classList.remove('show');if(d.error){toast(d.error);return}if(d.kind==='backgrounds'){await openSavedProject(d.project);toast('Đã tạo nền AI. Bạn có thể kiểm tra ảnh rồi xuất video.');return}showVideo(d.url);toast('Video của bạn đã sẵn sàng!')}}catch(e){clearInterval(timer);toast('Mất kết nối khi tạo video.')}} ,1800)}
+function showVideo(url){$('#stage').innerHTML='<video controls preload="metadata" playsinline src="'+url+'?t='+Date.now()+'" style="width:100%;height:100%;object-fit:contain;background:#14221d"></video><span class="stage-tag">VIDEO ĐÃ XUẤT</span>';let player=$('#stage video');player.muted=false;player.volume=1;$('#previewLabel').textContent='BẤM ▶ ĐỂ XEM CÓ TIẾNG';$('#duration').textContent='MP4 · HD';document.querySelectorAll('#preview > a').forEach(a=>a.remove());let a=document.createElement('a');a.href=url;a.download='video.mp4';a.className='btn btn-secondary';a.style='margin:0 14px 14px;width:calc(100% - 28px)';a.textContent='↓  Tải video MP4';$('#preview').append(a)}
+function updateKindFields(event){let kind=$('#charKind').value,human=['human','corpse','ghost'].includes(kind);$('#jobField').classList.toggle('hidden',!human||kind==='ghost');$('#hairStyleField').classList.toggle('hidden',!human);$('#charHair').closest('label').firstChild.textContent=human?'Màu tóc':'Màu lông / vảy';$('#charSkin').closest('label').firstChild.textContent=kind==='ghost'?'Màu ma':'Màu da';if(event){if(kind==='corpse'){$('#charPose').value='lying_left';$('#charSkin').value='#b8bdb6'}else if(kind==='ghost'){$('#charPose').value='standing';$('#charSkin').value='#e2e7e8'}else{$('#charPose').value='standing'}}}
 async function refreshCharacters(){try{let r=await fetch('/api/characters');characterRecords=await r.json();let list=$('#characterList');list.innerHTML='';if(!characterRecords.length){list.innerHTML='<div class=\"char-empty\">Ch\u01b0a c\u00f3 nh\u00e2n v\u1eadt ri\u00eang. T\u1ea1o nh\u00e2n v\u1eadt \u0111\u1ea7u ti\u00ean c\u1ee7a b\u1ea1n nh\u00e9.</div>';return}characterRecords.forEach(c=>{let card=document.createElement('article');card.className='character-card';let img=document.createElement('img');img.src=c.image+'?t='+Date.now();img.alt=c.name;let info=document.createElement('div');let b=document.createElement('b');b.textContent=c.name;let small=document.createElement('small');small.textContent=(c.kind?c.kind+' \u00b7 ':'')+c.gender+(c.age?' \u00b7 '+c.age+' tu\u1ed5i':'')+(c.job?' \u00b7 '+c.job:'')+(c.description?' \u00b7 '+c.description:'');let actions=document.createElement('div');actions.className='character-actions';let remake=document.createElement('button');remake.textContent='\u21bb T\u1ea1o bi\u1ebfn th\u1ec3';remake.onclick=()=>regenerateCharacter(c.id);let del=document.createElement('button');del.className='delete';del.textContent='X\u00f3a';del.onclick=()=>deleteCharacter(c.id,c.name);actions.append(remake,del);info.append(b,small,actions);card.append(img,info);list.append(card)});if(scenes.length)renderScenes()}catch(e){toast('Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c th\u01b0 vi\u1ec7n nh\u00e2n v\u1eadt.')}}
 async function regenerateCharacter(id){if(!confirm('T\u1ea1o m\u1ed9t ngo\u1ea1i h\u00ecnh m\u1edbi cho nh\u00e2n v\u1eadt n\u00e0y?'))return;try{let r=await fetch('/api/characters/'+encodeURIComponent(id)+'/regenerate',{method:'POST'}),d=await r.json();if(!r.ok)throw Error(d.error);await refreshCharacters();toast(d.message)}catch(e){toast(e.message)}}
 async function deleteCharacter(id,name){if(!confirm('X\u00f3a nh\u00e2n v\u1eadt '+name+' v\u00e0 to\u00e0n b\u1ed9 h\u00ecnh bi\u1ec3u c\u1ea3m c\u1ee7a nh\u00e2n v\u1eadt n\u00e0y?'))return;try{let r=await fetch('/api/characters/'+encodeURIComponent(id),{method:'DELETE'}),d=await r.json();if(!r.ok)throw Error(d.error);await refreshCharacters();toast('Đ\u00e3 x\u00f3a nh\u00e2n v\u1eadt '+name)}catch(e){toast(e.message)}}
-async function createCharacter(){let name=$('#charName').value.trim();if(!name){toast('Nhập tên nhân vật trước nhé.');return}let b=$('#createCharacter');b.disabled=true;b.textContent='Đang vẽ bộ biểu cảm…';try{let r=await fetch('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,gender:$('#charGender').value,age:$('#charAge').value,kind:$('#charKind').value,job:$('#charJob').value,skin:$('#charSkin').value,hair:$('#charHair').value,shirt:$('#charShirt').value,style:$('#charStyle').value,description:$('#charDescription').value})});let d=await r.json();if(!r.ok)throw Error(d.error);await refreshCharacters();$('#charName').value='';toast('Đã tạo nhân vật '+d.name+' với 14 biểu cảm.')}catch(e){toast(e.message)}finally{b.disabled=false;b.innerHTML='✦ &nbsp;Tạo bộ nhân vật'}}
+async function createCharacter(){let name=$('#charName').value.trim();if(!name){toast('Nhập tên nhân vật trước nhé.');return}let b=$('#createCharacter');b.disabled=true;b.textContent='Đang vẽ bộ biểu cảm…';try{let r=await fetch('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,gender:$('#charGender').value,age:$('#charAge').value,kind:$('#charKind').value,pose:$('#charPose').value,job:$('#charJob').value,skin:$('#charSkin').value,hair:$('#charHair').value,shirt:$('#charShirt').value,style:$('#charStyle').value,description:$('#charDescription').value})});let d=await r.json();if(!r.ok)throw Error(d.error);await refreshCharacters();$('#charName').value='';toast('Đã tạo nhân vật '+d.name+' với 14 biểu cảm.')}catch(e){toast(e.message)}finally{b.disabled=false;b.innerHTML='✦ &nbsp;Tạo bộ nhân vật'}}
 async function refreshBackgrounds(){try{let r=await fetch('/api/backgrounds');backgroundRecords=await r.json();let list=$('#backgroundList');if(!list)return;list.innerHTML='';if(!backgroundRecords.length){list.innerHTML='<div class="char-empty">Ch?a c? b?i c?nh t? t?o. H?y t?o b?i c?nh ??u ti?n.</div>';return}backgroundRecords.forEach(bg=>{let card=document.createElement('article');card.className='background-card';let img=document.createElement('img');img.src=bg.image+'?t='+Date.now();img.alt=bg.name;let info=document.createElement('div');let title=document.createElement('b');title.textContent=bg.name;let desc=document.createElement('p');desc.textContent=bg.description;let use=document.createElement('button');use.className='btn btn-secondary';use.textContent='D?ng trong storyboard';use.onclick=()=>{if(!scenes.length){toast('T?o storyboard tr??c r?i ch?n b?i c?nh cho t?ng c?nh nh?.');return}scenes.forEach(scene=>scene.background=bg.id);renderScenes();switchTab('video');$('#storyboard').scrollIntoView({behavior:'smooth'});toast('?? ??t '+bg.name+' cho c?c c?nh.')};let actions=document.createElement('div');actions.className='background-actions';let variant=document.createElement('button');variant.className='btn btn-secondary';variant.textContent='? T?o bi?n th?';variant.onclick=()=>regenerateBackground(bg);let del=document.createElement('button');del.className='btn btn-secondary danger';del.textContent='X?a';del.onclick=()=>deleteBackground(bg);actions.append(variant,del);info.append(title,desc,use,actions);card.append(img,info);list.append(card)});if(scenes.length)renderScenes()}catch(e){toast('Kh?ng t?i ???c th? vi?n b?i c?nh.')}}
 async function regenerateBackground(bg){if(!confirm('V? m?t bi?n th? m?i cho ?'+bg.name+'?? ?nh hi?n t?i s? ???c thay th?.'))return;try{let r=await fetch('/api/backgrounds/'+encodeURIComponent(bg.id)+'/variant',{method:'POST'}),d=await r.json();if(!r.ok)throw Error(d.error);await refreshBackgrounds();toast('?? v? bi?n th? m?i cho '+bg.name)}catch(e){toast(e.message)}}
 async function deleteBackground(bg){if(!confirm('X?a b?i c?nh ?'+bg.name+'? c?ng ?nh ?? v??'))return;try{let r=await fetch('/api/backgrounds/'+encodeURIComponent(bg.id),{method:'DELETE'}),d=await r.json();if(!r.ok)throw Error(d.error);await refreshBackgrounds();let fallback=backgroundRecords[0]?.id||'default';scenes.forEach(scene=>{if(scene.background===bg.id)scene.background=fallback});if(scenes.length)renderScenes();toast('?? x?a b?i c?nh '+bg.name)}catch(e){toast(e.message)}}
 async function saveBackground(){let name=$('#bgName').value.trim(),description=$('#bgDescription').value.trim();if(!name||!description){toast('Nh?p t?n v? m? t? b?i c?nh tr??c nh?.');return}let b=$('#saveBackground');b.disabled=true;b.textContent='?ang v? b?i c?nh?';try{let r=await fetch('/api/backgrounds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description})}),d=await r.json();if(!r.ok)throw Error(d.error);await refreshBackgrounds();$('#bgName').value='';$('#bgDescription').value='';toast('?? l?u v? v? b?i c?nh '+name)}catch(e){toast(e.message)}finally{b.disabled=false;b.innerHTML='&#10024; &nbsp;L?u m? t? v? v? b?i c?nh'}}
-async function loadSample(){try{let r=await fetch('/api/sample'),d=await r.json();story.value=d.story;$('#title').value=d.title;story.dispatchEvent(new Event('input'));toast('Đã tải câu chuyện mẫu.')}catch(e){toast('Không tải được truyện mẫu.')}}
+async function loadVoices(){try{let r=await fetch('/api/voices'),d=await r.json();if(!r.ok)throw Error(d.error);window.voiceOptions=d.voices;window.selectedVoices=d.selected;for(let [id,key] of [['narratorVoice','narrator'],['characterVoice','default']]){let select=document.getElementById(id);select.innerHTML='';for(let provider of ['edge','local']){let group=document.createElement('optgroup');group.label=provider==='local'?'Local · Không cần Internet':'Online · Tiếng Việt';for(let v of d.voices.filter(v=>v.provider===provider)){let o=document.createElement('option');o.value=v.id;o.textContent=v.name+' · '+v.language;group.append(o)}if(group.children.length)select.append(group)}select.value=d.selected[key];}renderSpeakerVoices();document.getElementById('voiceNote').textContent=d.local_error||'Giọng local dùng ngôn ngữ hiển thị bên cạnh tên. Giọng online cần Internet.';}catch(e){toast(e.message)}}
+function renderSpeakerVoices(){let container=document.getElementById('speakerVoiceChoices');container.innerHTML='';for(let character of window.storyCharacters||[]){let label=document.createElement('label');label.textContent='Giọng '+character.name;let select=document.createElement('select');select.style.width='100%';select.dataset.speakerVoice=character.id;for(let v of window.voiceOptions||[]){let option=document.createElement('option');option.value=v.id;option.textContent=v.name+' · '+v.language;select.append(option)}select.value=window.selectedVoices?.[character.id]||document.getElementById('characterVoice').value;select.onchange=saveVoices;label.append(select);container.append(label)}}
+async function saveVoices(){try{let r=await fetch('/api/voices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({narrator:document.getElementById('narratorVoice').value,default:document.getElementById('characterVoice').value,speakers:Object.fromEntries([...document.querySelectorAll('[data-speaker-voice]')].map(s=>[s.dataset.speakerVoice,s.value]))})}),d=await r.json();if(!r.ok)throw Error(d.error);toast('Đã lưu giọng đọc cho video.')}catch(e){toast(e.message);await loadVoices()}}
+let voicePreviewUrl;
+async function previewNarrator(button){button.disabled=true;try{let r=await fetch('/api/voices/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voice:document.getElementById('narratorVoice').value})});if(!r.ok){let d=await r.json();throw Error(d.error)}if(voicePreviewUrl)URL.revokeObjectURL(voicePreviewUrl);voicePreviewUrl=URL.createObjectURL(await r.blob());let audio=document.getElementById('voicePreview');audio.src=voicePreviewUrl;audio.style.display='block';await audio.play()}catch(e){toast(e.message)}finally{button.disabled=false}}
+loadVoices();
+async function refreshProjectPicker(){let r=await fetch('/api/projects');if(!r.ok)return;let data=await r.json(),select=document.getElementById('projectPicker');select.innerHTML='<option value="">Dự án đã lưu</option>';for(let item of data){let o=document.createElement('option');o.value=item.id;o.textContent=item.title;select.append(o)}select.value=window.currentProject||'';document.getElementById('deleteProject').disabled=!window.currentProject}
+function openProjects(){switchTab('video');refreshProjectPicker();document.getElementById('projectPicker').focus()}
+async function openSavedProject(id){if(!id)return;try{let r=await fetch('/api/projects/'+encodeURIComponent(id)),d=await r.json();if(!r.ok)throw Error('Không mở được dự án');window.currentProject=id;document.getElementById('deleteProject').disabled=false;if(d.subtitles){document.getElementById('subtitleFont').value=d.subtitles.font;document.getElementById('subtitleSize').value=d.subtitles.size;previewSubtitles()}story.value=d.story||'';$('#title').value=d.title;scenes=d.scenes;window.storyCharacters=d.bible?.characters||[];window.storyBackgrounds=d.bible?.backgrounds||[];renderScenes();renderSpeakerVoices();$('#storyboard').classList.add('show');$('#sceneCount').textContent=scenes.length+' cảnh';story.dispatchEvent(new Event('input'));if(d.video)showVideo(d.video)}catch(e){toast(e.message)}}
+function newProject(){window.currentProject=null;document.getElementById('deleteProject').disabled=true;window.storyBackgrounds=[];document.querySelectorAll('#preview > a').forEach(a=>a.remove());$('#stage').innerHTML='<div class="placeholder">Video xem trước sẽ xuất hiện tại đây</div>';$('#previewLabel').textContent='SẴN SÀNG';$('#duration').textContent='--:--';window.storyCharacters=[];scenes=[];story.value='';$('#title').value='';$('#storyboard').classList.remove('show');document.getElementById('projectPicker').value='';renderSpeakerVoices();story.dispatchEvent(new Event('input'))}
+refreshProjectPicker();
+function readSubtitles(){return {font:document.getElementById('subtitleFont').value,size:Number(document.getElementById('subtitleSize').value)}}
+let subtitleTimer;
+function previewSubtitles(){clearTimeout(subtitleTimer);subtitleTimer=setTimeout(()=>{let value=readSubtitles();if(!Number.isInteger(value.size)||value.size<16||value.size>96)return;document.getElementById('subtitlePreview').src='/api/subtitles/preview?font='+encodeURIComponent(value.font)+'&size='+value.size},180)}
+async function loadSubtitles(){try{let r=await fetch('/api/subtitles'),d=await r.json();let select=document.getElementById('subtitleFont');select.innerHTML='';for(let font of d.fonts){let o=document.createElement('option');o.value=font.id;o.textContent=font.name;select.append(o)}select.value=d.selected.font;document.getElementById('subtitleSize').value=d.selected.size;previewSubtitles()}catch(e){toast('Không tải được thiết lập phụ đề.')}}
+async function saveSubtitles(){try{let r=await fetch('/api/subtitles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...readSubtitles(),project:window.currentProject})}),d=await r.json();if(!r.ok)throw Error(d.error);toast('Đã lưu font và cỡ chữ phụ đề.')}catch(e){toast(e.message)}}
+loadSubtitles();
+async function matchBackgrounds(button){if(!window.currentProject)return toast('Hãy tạo storyboard hoặc mở dự án đã lưu trước.');button.disabled=true;try{let r=await fetch('/api/projects/'+encodeURIComponent(window.currentProject)+'/match-backgrounds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes})}),d=await r.json();if(!r.ok)throw Error(d.error||'Không khớp được bối cảnh');scenes=d.scenes;window.storyBackgrounds=d.backgrounds;renderScenes();toast('Đã khớp địa điểm và thời điểm. Kiểm tra ảnh nền rồi xuất video lại.')}catch(e){toast(e.message)}finally{button.disabled=false}}
+async function generateAIBackgrounds(button){if(!window.currentProject)return toast('Mở dự án hoặc tạo storyboard trước.');button.disabled=true;showProgress('Đang chuẩn bị model AI tạo background…');try{let r=await fetch('/api/projects/'+encodeURIComponent(window.currentProject)+'/generate-backgrounds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes})}),d=await r.json();if(!r.ok)throw Error(d.error);poll(d.job)}catch(e){$('#progress').classList.remove('show');toast(e.message)}finally{button.disabled=false}}
+async function deleteCurrentProject(){let id=window.currentProject;if(!id)return;let title=document.getElementById('projectPicker').selectedOptions[0]?.textContent||$('#title').value||id;if(!confirm('Xóa dự án “'+title+'”? Toàn bộ truyện, storyboard, ảnh nền, âm thanh và video của dự án sẽ bị xóa. Không thể hoàn tác.'))return;let button=document.getElementById('deleteProject');button.disabled=true;let player=document.querySelector('#stage video'),src=player?.getAttribute('src');if(player){player.pause();player.removeAttribute('src');player.load()}try{let r=await fetch('/api/projects/'+encodeURIComponent(id),{method:'DELETE'}),d=await r.json();if(!r.ok)throw Error(d.error);newProject();await refreshProjectPicker();toast('Đã xóa dự án.')}catch(e){if(player&&src){player.src=src;player.load()}toast(e.message)}finally{button.disabled=!window.currentProject}}
+async function matchCharacters(button){if(!window.currentProject)return toast('Mở dự án hoặc tạo storyboard trước.');button.disabled=true;try{let r=await fetch('/api/projects/'+encodeURIComponent(window.currentProject)+'/match-characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes})}),d=await r.json();if(!r.ok)throw Error(d.error||'Không nhận diện được nhân vật');scenes=d.scenes;window.storyCharacters=d.characters;renderScenes();renderSpeakerVoices();toast('Đã gợi ý nhân vật xuất hiện theo câu văn. Bạn có thể chỉnh lại từng cảnh.')}catch(e){toast(e.message)}finally{button.disabled=false}}
 </script></body></html>'''
+
+
+
+@app.get('/api/voices')
+def get_voices():
+    from voice_engine import voice_options
+    options, error = voice_options()
+    config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
+    return jsonify(voices=options, selected=config['voices'], local_error=error)
+
+
+@app.post('/api/voices')
+def save_voices():
+    from voice_engine import voice_options
+    data = request.get_json(force=True)
+    options, _ = voice_options()
+    allowed = {v['id'] for v in options}
+    if any(data.get(key) not in allowed for key in ('narrator', 'default')):
+        return jsonify(error='Giọng đọc không có trên máy hoặc không được hỗ trợ.'), 400
+    speakers = data.get('speakers', {})
+    if not isinstance(speakers, dict) or any(not re.fullmatch(r'[a-z0-9_]+', key) or value not in allowed for key, value in speakers.items()):
+        return jsonify(error='Giọng nhân vật không hợp lệ.'), 400
+    with SETTINGS_LOCK:
+        path = ROOT / 'config.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        config['voices'].update(speakers)
+        config['voices'].update({key: data[key] for key in ('narrator', 'default')})
+        temporary = path.with_suffix('.json.tmp')
+        temporary.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary.replace(path)
+    return jsonify(ok=True)
+
+
+@app.post('/api/voices/preview')
+def preview_voice():
+    import asyncio
+    import io
+    import tempfile
+    from voice_engine import voice_options, synthesize
+    data = request.get_json(force=True)
+    options, _ = voice_options()
+    voice = data.get('voice')
+    if voice not in {v['id'] for v in options}:
+        return jsonify(error='Giọng đọc không hợp lệ.'), 400
+    text = 'Hello! This is the local narrator voice.' if voice.startswith('local:') else 'Xin chào, đây là giọng kể cho câu chuyện của bạn.'
+    try:
+        preview_root = ROOT / 'projects'
+        preview_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='story_preview_', dir=preview_root) as directory:
+            path = Path(directory) / 'preview.mp3'
+            config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
+            profile = config.get('narrator_profile', {}) if voice == config['voices'].get('narrator') else {}
+            asyncio.run(synthesize(text, voice, path, rate=config.get('rate', '+0%'), profile=profile))
+            audio = io.BytesIO(path.read_bytes())
+        return send_file(audio, mimetype='audio/mpeg')
+    except Exception as exc:
+        return jsonify(error=f'Không tạo được giọng đọc: {exc}'), 500
+
+
+
+
+@app.get('/api/subtitles')
+def subtitle_settings():
+    from subtitle_settings import font_options
+    config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
+    return jsonify(fonts=font_options(), selected=config.get('subtitles', {'font':'arial_italic', 'size':36}))
+
+
+@app.post('/api/subtitles')
+def save_subtitle_settings():
+    from subtitle_settings import validate
+    try:
+        data = request.get_json(force=True)
+        value = validate(data)
+        project_path = project_folder(data['project']) / 'project.json' if data.get('project') else None
+        if project_path is not None and not project_path.exists():
+            return jsonify(error='Không tìm thấy dự án.'), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    with SETTINGS_LOCK:
+        path = ROOT / 'config.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        config['subtitles'] = value
+        if project_path is not None:
+            project = json.loads(project_path.read_text(encoding='utf-8'))
+            project['subtitles'] = value
+            project_path.write_text(json.dumps(project, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary = path.with_suffix('.json.tmp')
+        temporary.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary.replace(path)
+    return jsonify(ok=True)
+
+
+@app.get('/api/subtitles/preview')
+def subtitle_preview():
+    import io
+    from PIL import Image, ImageDraw
+    from subtitle_settings import validate, load_font
+    try:
+        value = validate({'font': request.args.get('font'), 'size': int(request.args.get('size', '36'))})
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
+    font = load_font(value, config)
+    image = Image.new('RGB', (1280, 300), '#211b27')
+    draw = ImageDraw.Draw(image)
+    words = 'Giữa đêm khuya, tiếng gõ cửa lại vang lên… Ai đang đứng ngoài đó?'.split()
+    lines, line = [], ''
+    for word in words:
+        candidate = (line + ' ' + word).strip()
+        if line and font.getlength(candidate) > 1152:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    lines.append(line)
+    y = max(12, (300 - len(lines) * value['size'] * 1.3) / 2)
+    for line in lines:
+        draw.text(((1280-font.getlength(line))/2, y), line, font=font, fill='#fff6dd', stroke_width=2, stroke_fill='#121418')
+        y += value['size'] * 1.3
+    output = io.BytesIO()
+    image.resize((640, 150)).save(output, format='PNG')
+    output.seek(0)
+    return send_file(output, mimetype='image/png')
+
+
+
+def apply_background_descriptions(bible, scenes):
+    import hashlib
+    records = {item['id']: item for item in bible.get('backgrounds', [])}
+    for scene in scenes:
+        description = str(scene.get('background_description', '')).strip()[:1000]
+        if description and description != records.get(scene['background'], {}).get('description'):
+            bid = 'custom_' + hashlib.sha256(description.encode()).hexdigest()[:12]
+            scene['background'] = bid
+            records[bid] = dict(id=bid, name='Bối cảnh tùy chỉnh', description=description)
+    bible['backgrounds'] = list(records.values())
+    return bible
+
+def project_folder(pid):
+    if not re.fullmatch(r"[a-z0-9_]+", str(pid)):
+        abort(400)
+    return ROOT / "projects" / pid
+
+
+def save_project(data, bible, scenes):
+    pid = data.get("project") or uuid.uuid4().hex[:12]
+    folder = project_folder(pid)
+    folder.mkdir(parents=True, exist_ok=True)
+    metadata = {"id": pid, "title": str(data.get("title") or "Dự án chưa đặt tên")[:120],
+                "story": str(data.get("story", "")), "updated": time.time()}
+    if data.get("subtitles"):
+        metadata["subtitles"] = data["subtitles"]
+    previous = folder / "project.json"
+    if previous.exists():
+        old = json.loads(previous.read_text(encoding="utf-8"))
+        if "subtitles" not in metadata and old.get("subtitles"):
+            metadata["subtitles"] = old["subtitles"]
+        if not metadata["story"]:
+            metadata["story"] = old.get("story", "")
+    previous.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = folder / "storyboard.json"
+    path.write_text(json.dumps({"bible": bible, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
+    from assetgen import generate_background
+    for background in bible.get('backgrounds', []):
+        bid = background.get('id', '')
+        if not re.fullmatch(r'[a-z0-9_]+', bid):
+            continue
+        target = folder / 'backgrounds' / (bid + '.png')
+        if not target.exists() and background.get('description'):
+            generate_background(bid, target, background['description'])
+    return pid, path
+
+
+@app.get("/api/projects")
+def list_projects():
+    records = []
+    for path in (ROOT / "projects").glob("*/project.json"):
+        try:
+            item = json.loads(path.read_text(encoding="utf-8"))
+            records.append({"id": item["id"], "title": item["title"], "updated": item.get("updated", 0)})
+        except (ValueError, KeyError):
+            continue
+    return jsonify(sorted(records, key=lambda item: item["updated"], reverse=True))
+
+
+
+@app.get('/projects/<pid>/backgrounds/<bid>/image')
+def project_background(pid, bid):
+    if not re.fullmatch(r'[a-z0-9_]+', bid):
+        abort(400)
+    path = project_folder(pid) / 'backgrounds' / (bid + '.ai.png')
+    if not path.exists():
+        path = project_folder(pid) / 'backgrounds' / (bid + '.png')
+    if not path.exists():
+        abort(404)
+    return send_file(path, mimetype='image/png', conditional=True)
+
+
+
+@app.post('/api/projects/<pid>/generate-backgrounds')
+def generate_ai_backgrounds(pid):
+    folder = project_folder(pid)
+    if not (folder / 'storyboard.json').exists():
+        abort(404)
+    incoming = request.get_json(silent=True) or {}
+    if incoming.get('scenes'):
+        scenes = incoming['scenes']
+        if not isinstance(scenes, list) or any(not isinstance(s, dict) or not all(k in s for k in ('text','speaker','background','emotion')) for s in scenes):
+            return jsonify(error='Storyboard không hợp lệ.'), 400
+        metadata = json.loads((folder / 'project.json').read_text(encoding='utf-8'))
+        storyboard = json.loads((folder / 'storyboard.json').read_text(encoding='utf-8'))
+        bible = apply_background_descriptions(storyboard.get('bible', {}), scenes)
+        save_project(dict(metadata, project=pid), bible, scenes)
+    with LOCK:
+        if any(not item['done'] and item.get('kind') == 'backgrounds' for item in JOBS.values()):
+            return jsonify(error='Đang tạo nền AI. Chờ tác vụ hiện tại hoàn tất.'), 409
+    jid = start_job([sys.executable, '-u', str(ROOT / 'local_backgrounds.py'), str(folder)], kind='backgrounds', project=pid)
+    if jid is None:
+        return jsonify(error="Dự án đang có tác vụ xử lý. Chờ hoàn tất rồi thử lại."), 409
+    return jsonify(job=jid, project=pid)
+
+
+
+@app.post('/api/projects/<pid>/match-characters')
+def match_project_characters(pid):
+    from character_presence import suggest_characters
+    folder = project_folder(pid)
+    if not (folder / 'project.json').exists():
+        abort(404)
+    metadata = json.loads((folder / 'project.json').read_text(encoding='utf-8'))
+    storyboard = json.loads((folder / 'storyboard.json').read_text(encoding='utf-8'))
+    incoming = request.get_json(silent=True) or {}
+    scenes = incoming.get('scenes', storyboard['scenes'])
+    if not isinstance(scenes, list) or not scenes or any(not isinstance(s, dict) or not isinstance(s.get('text'), str) for s in scenes):
+        return jsonify(error='Storyboard không hợp lệ.'), 400
+    cast_path = ROOT / 'assets' / 'cast.json'
+    cast = json.loads(cast_path.read_text(encoding='utf-8')) if cast_path.exists() else {}
+    bible = storyboard.get('bible', {})
+    characters, scenes = suggest_characters(scenes, bible.get('characters', []), cast)
+    bible['characters'] = characters
+    save_project(dict(metadata, project=pid), bible, scenes)
+    return jsonify(characters=characters, scenes=scenes)
+
+
+@app.post('/api/projects/<pid>/match-backgrounds')
+def match_project_backgrounds(pid):
+    from scene_backgrounds import plan_backgrounds
+    folder = project_folder(pid)
+    if not (folder / 'project.json').exists():
+        abort(404)
+    metadata = json.loads((folder / 'project.json').read_text(encoding='utf-8'))
+    storyboard = json.loads((folder / 'storyboard.json').read_text(encoding='utf-8'))
+    incoming = request.get_json(silent=True) or {}
+    current_scenes = incoming.get('scenes', storyboard['scenes'])
+    if not isinstance(current_scenes, list) or not current_scenes or any(not isinstance(s, dict) or not isinstance(s.get('text'), str) for s in current_scenes):
+        return jsonify(error='Storyboard không hợp lệ.'), 400
+    backgrounds, scenes = plan_backgrounds(current_scenes)
+    bible = storyboard.get('bible', {})
+    bible['backgrounds'] = backgrounds
+    save_project(dict(metadata, project=pid), bible, scenes)
+    return jsonify(scenes=scenes, backgrounds=backgrounds)
+
+
+
+@app.delete('/api/projects/<pid>')
+def delete_project(pid):
+    folder = project_folder(pid)
+    expected_parent = (ROOT / 'projects').resolve()
+    resolved = folder.resolve()
+    if resolved.parent != expected_parent or folder.is_symlink():
+        return jsonify(error='Đường dẫn dự án không hợp lệ.'), 400
+    with LOCK:
+        if any(not job['done'] and job.get('project') == pid for job in JOBS.values()):
+            return jsonify(error='Dự án đang tạo ảnh hoặc dựng video. Chờ hoàn tất rồi xóa.'), 409
+        if not (resolved / 'project.json').is_file():
+            return jsonify(error='Không tìm thấy dự án.'), 404
+        image_lock = resolved / 'backgrounds' / '.generation.lock'
+        if image_lock.exists() and os.name == 'nt':
+            import msvcrt
+            try:
+                with image_lock.open('r+b') as handle:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                return jsonify(error='Dự án đang tạo background AI. Chờ hoàn tất rồi xóa.'), 409
+        try:
+            shutil.rmtree(resolved)
+        except PermissionError:
+            return jsonify(error='Một tệp dự án đang được sử dụng. Đóng video hoặc ảnh đang mở rồi thử lại.'), 409
+        except OSError as exc:
+            return jsonify(error=f'Không xóa được dự án: {exc}'), 500
+    return jsonify(ok=True)
+
+
+@app.get("/api/projects/<pid>")
+def load_project(pid):
+    folder = project_folder(pid)
+    if not (folder / "project.json").exists():
+        abort(404)
+    data = json.loads((folder / "project.json").read_text(encoding="utf-8"))
+    data.update(json.loads((folder / "storyboard.json").read_text(encoding="utf-8")))
+    data["video"] = f"/projects/{pid}/video" if (folder / "video.mp4").exists() else None
+    return jsonify(data)
+
+
+@app.get("/projects/<pid>/video")
+def project_video(pid):
+    path = project_folder(pid) / "video.mp4"
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="video/mp4", conditional=True,
+                     as_attachment=request.args.get("download") == "1", download_name="video.mp4")
 
 
 @app.get("/")
 def index():
     return render_template_string(PAGE)
-
-
-@app.get("/api/sample")
-def sample():
-    return jsonify(title="Tiếng gõ cửa lúc ba giờ sáng", story=(ROOT / "truyen_mau.txt").read_text(encoding="utf-8"))
 
 
 @app.get("/api/settings")
@@ -341,6 +669,19 @@ def character_image(cid):
     path = ROOT / "assets" / "characters" / cid / "neutral.png"
     if not path.exists():
         abort(404)
+    cast_path = ROOT / 'assets' / 'cast.json'
+    cast = json.loads(cast_path.read_text(encoding='utf-8')) if cast_path.exists() else {}
+    spec = cast.get(cid, {})
+    pose = spec.get('pose', 'lying_left' if spec.get('kind') == 'corpse' else 'standing')
+    if pose != 'standing':
+        import io
+        from PIL import Image
+        from assetgen import pose_sprite
+        image = pose_sprite(Image.open(path).convert('RGBA'), pose)
+        output = io.BytesIO()
+        image.save(output, format='PNG')
+        output.seek(0)
+        return send_file(output, mimetype='image/png')
     return send_file(path, mimetype="image/png", conditional=True)
 
 
@@ -355,20 +696,23 @@ def regenerate_character(cid):
     try:
         import assetgen
         spec = cast[cid]
+        original = dict(spec)
         gender = spec.get("gender", "nam")
         # A new seed changes the generator's palette and hairstyle while preserving identity.
         job = spec.get("job", "none")
         kind = spec.get("kind", "human")
+        pose = spec.get("pose", "lying_left" if kind == "corpse" else "standing")
         varied = assetgen.make_spec(cid + secrets.token_hex(8), gender)
         for key in ("skin", "hair", "shirt", "pants"):
             varied[key] = "#%02x%02x%02x" % tuple(varied[key])
         spec.update(varied)
-        spec["name"] = cast[cid].get("name", cid)
+        spec["name"] = original.get("name", cid)
         spec["gender"] = gender
-        spec["age"] = cast[cid].get("age", 25)
-        spec["description"] = cast[cid].get("description", "")
+        spec["age"] = original.get("age", 25)
+        spec["description"] = original.get("description", "")
         spec["job"] = job
         spec["kind"] = kind
+        spec["pose"] = pose
         assetgen.generate_character_set(cid, gender, ROOT / "assets" / "characters" / cid, spec)
         cast_path.write_text(json.dumps(cast, ensure_ascii=False, indent=2), encoding="utf-8")
         return jsonify(ok=True, image=f"/api/characters/{cid}/image", message="Đã tạo một biến thể ngoại hình mới.")
@@ -433,10 +777,14 @@ def create_character():
     if spec["style"] not in ("long", "bun", "bob", "ponytail", "curly", "spiky", "short", "side", "bald_top"):
         return jsonify(error="Kiểu tóc không hợp lệ."), 400
     kind = str(data.get("kind", "human"))
-    if kind not in ("human", "dog", "cat", "crocodile", "ghost"):
+    if kind not in ("human", "dog", "cat", "crocodile", "ghost", "corpse"):
         return jsonify(error="Loại nhân vật không hợp lệ."), 400
     spec["kind"] = kind
-    if kind != "human":
+    pose = str(data.get("pose", "lying_left" if kind == "corpse" else "standing"))
+    if pose not in ("standing", "lying_left", "lying_right"):
+        return jsonify(error="Tư thế không hợp lệ."), 400
+    spec["pose"] = pose
+    if kind not in ("human", "corpse"):
         spec["job"] = "none"
     if spec["job"] not in ("none", "doctor", "chef", "police", "artist", "office", "teacher", "engineer", "farmer", "daoist"):
         return jsonify(error="Nghề nghiệp không hợp lệ."), 400
@@ -462,30 +810,27 @@ def storyboard():
         if ai["provider"] != "ollama" and not ai["api_key"]:
             # Bản fallback chia theo câu, không viết lại nội dung; cho phép dùng app
             # offline với storyboard thủ công và khả năng render vốn có.
-            import json as _json
-            bible = _json.loads((ROOT / "storyboard_truyen_mau.json").read_text(encoding="utf-8")).get("bible", {})
-            chars = bible.get("characters", [])
-            bgs = bible.get("backgrounds", [])
+            # A user's story must not depend on demo files or inherit demo characters.
+            chars = []
+            background_dir = ROOT / "assets" / "backgrounds"
+            bgs = [{"id": path.stem, "description": path.stem.replace("_", " ")}
+                   for path in sorted(background_dir.glob("*.png"))
+                   if re.fullmatch(r"[a-z0-9_]+", path.stem)]
+            if not bgs:
+                bgs = [{"id": "default", "description": "Bối cảnh mặc định"}]
             bg = bgs[0].get("id", "default") if bgs else "default"
-            sentences = [s.strip() for s in re.split(r"(?<=[.!?…])\s+|\n+", story) if s.strip()]
-            scenes = []
-            for sentence in sentences:
-                chunks = re.split(r"(?<=[,;:])\s+", sentence)
-                current = ""
-                for chunk in chunks:
-                    if current and len(current.split()) + len(chunk.split()) > 25:
-                        scenes.append({"speaker": "narrator", "text": current.strip(), "emotion": "neutral", "background": bg, "characters": []})
-                        current = ""
-                    current = (current + " " + chunk).strip()
-                if current:
-                    scenes.append({"speaker": "narrator", "text": current, "emotion": "neutral", "background": bg, "characters": []})
+            from offline_storyboard import split_story
+            cast_path = ROOT / "assets" / "cast.json"
+            cast = json.loads(cast_path.read_text(encoding="utf-8")) if cast_path.exists() else {}
+            chars, scenes = split_story(story, bg, cast)
+            from scene_backgrounds import plan_backgrounds
+            bgs, scenes = plan_backgrounds(scenes)
+            from character_presence import suggest_characters
+            chars, scenes = suggest_characters(scenes, chars, cast)
             if not scenes:
                 return jsonify(error="Không tìm thấy câu nào trong truyện."), 400
-            sid = str(uuid.uuid4())[:8]
-            path = ROOT / "build" / f"storyboard_{sid}.json"
-            path.parent.mkdir(exist_ok=True)
-            path.write_text(json.dumps({"bible": {"characters": chars, "backgrounds": bgs}, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
-            return jsonify(scenes=scenes, storyboard=str(path), message=f"Đã chia thành {len(scenes)} cảnh cơ bản. Bạn có thể sửa lời thoại rồi tạo video.")
+            pid, path = save_project(data, {"characters": chars, "backgrounds": bgs}, scenes)
+            return jsonify(project=pid, backgrounds=bgs, scenes=scenes, characters=chars, storyboard=str(path), message=f"Đã chia {len(scenes)} cảnh, nhận diện {len(chars)} nhân vật. Lời thoại cần có tên người nói, ví dụ: Lan nói: “Xin chào”.")
         import storyboard as storylib
         storylib.configure_client(ai["provider"], ai["api_key"], ai["model"], ai.get("base_url"))
         bible = storylib.ask_json(storylib.BIBLE_SYS, story[:60000], max_tokens=3000)
@@ -506,19 +851,18 @@ def storyboard():
                 if scene.get("emotion") not in storylib.EMOTIONS.split("|"):
                     scene["emotion"] = "neutral"
             scenes.extend(part)
-        sid = str(uuid.uuid4())[:8]
-        path = ROOT / "build" / f"storyboard_{sid}.json"
-        path.parent.mkdir(exist_ok=True)
-        path.write_text(json.dumps({"bible": bible, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
-        return jsonify(scenes=scenes, storyboard=str(path), message=f"Đã tạo {len(scenes)} cảnh. Chỉnh sửa lời thoại rồi bấm Tạo video.")
+        pid, path = save_project(data, bible, scenes)
+        return jsonify(project=pid, backgrounds=bible.get("backgrounds", []), scenes=scenes, characters=bible.get("characters", []), storyboard=str(path), message=f"Đã tạo {len(scenes)} cảnh. Chỉnh sửa lời thoại rồi bấm Tạo video.")
     except Exception as exc:
         return jsonify(error=f"Không thể tạo storyboard: {exc}"), 500
 
 
-def start_job(command, kind="render"):
+def start_job(command, kind="render", project=None):
     jid = str(uuid.uuid4())[:10]
     with LOCK:
-        JOBS[jid] = {"done": False, "progress": 0, "message": "Đang khởi chạy…", "error": None, "kind": kind}
+        if project and any(not item["done"] and item.get("project") == project for item in JOBS.values()):
+            return None
+        JOBS[jid] = {"done": False, "progress": 0, "message": "Đang khởi chạy…", "error": None, "kind": kind, "project": project}
 
     def worker():
         try:
@@ -542,11 +886,14 @@ def start_job(command, kind="render"):
                 job = JOBS[jid]
                 job["done"] = True
                 job["progress"] = 1
-                if code == 0 and (ROOT / "video.mp4").exists():
+                if code == 0 and kind == "backgrounds":
+                    job["message"] = "Background AI đã sẵn sàng."
+                    job["project"] = project
+                elif code == 0 and (project_folder(project) / "video.mp4").exists():
                     job["message"] = "Video đã sẵn sàng."
-                    job["url"] = "/video"
+                    job["url"] = f"/projects/{project}/video"
                 else:
-                    job["error"] = "Không tạo được video. Kiểm tra ffmpeg, edge-tts và nội dung storyboard. " + " ".join(lines[-3:])[-450:]
+                    job["error"] = ("Không tạo được background AI. Chi tiết: " if kind == "backgrounds" else "Không tạo được video. Chi tiết: ") + " ".join(lines[-3:])[-450:]
                     job["message"] = "Tạo video gặp lỗi."
         except FileNotFoundError as exc:
             missing = Path(str(exc.filename or "")).name or "ffmpeg"
@@ -565,27 +912,39 @@ def start_job(command, kind="render"):
 @app.post("/api/render")
 def render():
     data = request.get_json(force=True)
-    if not shutil.which("ffmpeg"):
-        return jsonify(error="Máy chưa cài FFmpeg hoặc chưa có ffmpeg.exe trong PATH. Cài FFmpeg, thêm thư mục chứa ffmpeg.exe vào PATH, rồi đóng và mở lại PowerShell và Story Studio."), 400
+    if not ffmpeg_available():
+        return jsonify(error="Chưa có bộ dựng video. Chạy python -m pip install -r requirements.txt rồi mở lại ứng dụng."), 400
+    with LOCK:
+        if data.get("project") and any(not item["done"] and item.get("project") == data["project"] for item in JOBS.values()):
+            return jsonify(error="Dự án đang tạo ảnh hoặc dựng video. Chờ hoàn tất rồi thử lại."), 409
     scenes = data.get("scenes", [])
     if not scenes:
         return jsonify(error="Storyboard chưa có cảnh nào."), 400
     for s in scenes:
+        poses = s.get("character_poses", {})
+        if not isinstance(poses, dict) or any(value not in ("standing", "lying_left", "lying_right") for value in poses.values()):
+            return jsonify(error="Tư thế trong cảnh không hợp lệ."), 400
         if not all(k in s for k in ("speaker", "text", "emotion", "background")):
             return jsonify(error="Storyboard có cảnh thiếu dữ liệu."), 400
-    path = ROOT / "build" / f"storyboard_ui_{uuid.uuid4().hex[:8]}.json"
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps({"scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
-    jid = start_job([sys.executable, str(ROOT / "make_video.py"), str(path)])
-    return jsonify(job=jid)
+    from subtitle_settings import validate
+    try:
+        config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
+        data['subtitles'] = validate(data.get('subtitles', config.get('subtitles', {'font':'arial_italic', 'size':36})))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    pid = data.get("project")
+    bible = {"characters": data.get("characters", []), "backgrounds": []}
+    if pid:
+        previous = project_folder(pid) / "storyboard.json"
+        if previous.exists():
+            bible = json.loads(previous.read_text(encoding="utf-8")).get("bible", bible)
+    bible = apply_background_descriptions(bible, scenes)
+    pid, path = save_project(data, bible, scenes)
+    jid = start_job([sys.executable, str(ROOT / "make_video.py"), str(path)], project=pid)
+    if jid is None:
+        return jsonify(error="Dự án đang có tác vụ xử lý. Chờ hoàn tất rồi thử lại."), 409
+    return jsonify(job=jid, project=pid)
 
-
-@app.post("/api/render-demo")
-def render_demo():
-    if not shutil.which("ffmpeg"):
-        return jsonify(error="Máy chưa cài FFmpeg hoặc chưa có ffmpeg.exe trong PATH. Cài FFmpeg, thêm thư mục chứa ffmpeg.exe vào PATH, rồi đóng và mở lại PowerShell và Story Studio."), 400
-    path = ROOT / "storyboard_truyen_mau.json"
-    return jsonify(job=start_job([sys.executable, str(ROOT / "make_video.py"), str(path)]))
 
 
 @app.get("/api/jobs/<jid>")
@@ -599,7 +958,8 @@ def job_status(jid):
 
 @app.get("/video")
 def video():
-    path = ROOT / "video.mp4"
+    videos = list((ROOT / "projects").glob("*/video.mp4"))
+    path = max(videos, key=lambda p: p.stat().st_mtime) if videos else ROOT / "projects" / "video.mp4"
     if not path.exists():
         return "Chưa có video", 404
     return send_file(path, mimetype="video/mp4", conditional=True, as_attachment=request.args.get("download") == "1", download_name="video.mp4")

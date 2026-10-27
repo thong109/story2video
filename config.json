@@ -1,5 +1,8 @@
 {
-  "size": [1280, 720],
+  "size": [
+    1280,
+    720
+  ],
   "fps": 12,
   "font": "assets/font.ttf",
   "font_size": 40,
@@ -7,9 +10,32 @@
   "rate": "+0%",
   "pad_seconds": 0.3,
   "voices": {
-    "narrator": "vi-VN-NamMinhNeural",
-    "default": "vi-VN-HoaiMyNeural",
+    "narrator": "piper:ngocngan3701",
+    "default": "piper:manhdung",
     "ten_nhan_vat_nam": "vi-VN-NamMinhNeural",
-    "ten_nhan_vat_nu": "vi-VN-HoaiMyNeural"
+    "ten_nhan_vat_nu": "vi-VN-HoaiMyNeural",
+    "tu_truyen": "piper:manhdung",
+    "dat": "vi-VN-NamMinhNeural",
+    "toi": "piper:manhdung",
+    "ma": "piper:banmai"
+  },
+  "narrator_profile": {
+    "speed": 0.9,
+    "pitch_semitones": -1,
+    "expression": 0.5,
+    "variation": 0.65,
+    "loudness_lufs": -18
+  },
+  "subtitles": {
+    "font": "tahoma",
+    "size": 28
+  },
+  "backgrounds": {
+    "provider": "local_ai",
+    "model_dir": "models/sd15-openvino",
+    "device": "GPU",
+    "width": 640,
+    "height": 384,
+    "steps": 20
   }
 }

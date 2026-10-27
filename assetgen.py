@@ -17,6 +17,7 @@ import unicodedata
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
+from character_age import age_of
 
 EMOTIONS = ["neutral", "happy", "sad", "angry", "scared", "surprised", "thinking"]
 INK = (28, 28, 32, 255)
@@ -179,7 +180,27 @@ def _hair_back(c, sp):
 
 
 def _face(c, emo, talk, sp):
+    if sp.get("kind") == "ghost":
+        # Human face with sunken sockets, without cartoon pupils or cheek blush.
+        for x in (160, 240):
+            c.ell(x, 184, 27, 30, (150, 156, 159, 150))
+            c.ell(x, 180, 21, 26 if emo in ("scared", "surprised") else 23, (16, 18, 24, 255))
+            c.line([(x - 17, 212), (x + 16, 213)], 3, (103, 111, 117, 200))
+        c.line([(145, 222), (153, 239)], 2, (139, 148, 150, 190))
+        c.line([(255, 222), (247, 239)], 2, (139, 148, 150, 190))
+        c.line([(199, 207), (194, 224), (205, 224)], 3, (123, 133, 138, 220))
+        if talk:
+            c.ell(200, 254, 12, 19, (27, 24, 33, 255))
+        else:
+            c.line([(182, 252), (200, 254), (218, 252)], 4, (58, 53, 65, 255))
+        return
     fem = sp["fem"]
+    if sp.get("kind") == "corpse":
+        for x in (160, 240):
+            c.arc((x - 19, 172, x + 19, 188), 5, 175, 5)
+        c.arc((190, 205, 210, 225), 20, 160, 3)
+        c.line([(183, 250), (217, 250)], 4)
+        return
     L, R = (160, 180), (240, 180)
     white = (255, 255, 255, 255)
     # mắt
@@ -191,7 +212,7 @@ def _face(c, emo, talk, sp):
             "neutral": (19, 7, 0, 2), "sad": (18, 7, 0, 6), "angry": (18, 7, 0, 3),
             "scared": (25, 4, 0, 0), "surprised": (26, 5, 0, 0), "thinking": (19, 7, 8, -6),
         }[emo]
-        if sp.get("age", 25) < 13:
+        if sp.get("age", 25) < 12:
             r += 3
             pr += 1
         for cx, cy in (L, R):
@@ -313,7 +334,9 @@ def _profession_details(c, job):
 
 
 def _finish_sprite(c):
-    out = c.im.resize((CW * OUT_SCALE, CH * OUT_SCALE), Image.LANCZOS)
+    width = CW * OUT_SCALE
+    height = max(1, round(c.im.height * width / c.im.width))
+    out = c.im.resize((width, height), Image.LANCZOS)
     alpha = out.getchannel("A")
     glow_mask = alpha.filter(ImageFilter.GaussianBlur(28)).point(lambda value: int(value * 0.16))
     glow = Image.new("RGBA", out.size, (255, 210, 148, 0))
@@ -396,7 +419,11 @@ def draw_creature(sp, emo="neutral", talk=False):
 
 
 def draw_character(sp, emo="neutral", talk=False):
-    if sp.get("kind", "human") != "human":
+    if sp.get("kind") == "corpse":
+        emo, talk = "neutral", False
+    if sp.get("kind") == "ghost":
+        sp = dict(sp, skin=(232, 236, 232), glasses=False, freckles=False)
+    if sp.get("kind", "human") not in ("human", "corpse", "ghost"):
         return draw_creature(sp, emo, talk)
     c = _C()
     gold = (238, 190, 65, 255)
@@ -445,7 +472,27 @@ def draw_character(sp, emo="neutral", talk=False):
         c.d.rectangle([178 * SK, 42 * SK, 222 * SK, 63 * SK], fill=(35, 45, 58, 255), outline=INK, width=5 * SK)
     if front_right:
         _draw_arm(c, right, sp)
+    if age_of(sp) < 12:
+        # Preserve the head while shortening the torso, arms and legs.
+        width, height = c.im.size
+        join = 280 * SK
+        factor = 0.58 if age_of(sp) <= 3 else 0.65 if age_of(sp) <= 7 else 0.72
+        upper = c.im.crop((0, 0, width, join))
+        lower = c.im.crop((0, join, width, height))
+        lower = lower.resize((round(width * 0.90), round(lower.height * factor)), Image.Resampling.LANCZOS)
+        child = Image.new('RGBA', (width, join + lower.height), (0,0,0,0))
+        child.alpha_composite(upper)
+        child.alpha_composite(lower, ((width-lower.width)//2, join))
+        c.im = child
     return _finish_sprite(c)
+
+
+def pose_sprite(image, pose):
+    if pose not in ('lying_left', 'lying_right'):
+        return image
+    image = image.rotate(90 if pose == 'lying_left' else -90, expand=True)
+    bounds = image.getbbox()
+    return image.crop(bounds) if bounds else image
 
 
 def generate_character_set(cid, gender, folder, override=None):
@@ -455,6 +502,7 @@ def generate_character_set(cid, gender, folder, override=None):
     for emo in EMOTIONS:
         draw_character(sp, emo, False).save(folder / f"{emo}.png")
         draw_character(sp, emo, True).save(folder / f"{emo}_talk.png")
+    (folder / "generated.json").write_text(json.dumps({"generator":"assetgen", "age":sp["age"], "kind":sp.get("kind", "human"), "version":"child-age-v2"}), encoding="utf-8")
 
 
 # ------------------------------------------------------------------ nền
@@ -631,6 +679,10 @@ def _forest(d, r, tk):
 
 
 def generate_background(bid, path, description="", variant_seed=None):
+    from background_art import draw_story_set
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    if draw_story_set(bid, description, path, (BW, BH)):
+        return
     tk = _tokens(str(bid) + " " + str(description))
     r = random.Random(variant_seed if variant_seed is not None else bid)
     im = Image.new("RGB", (BW, BH))
@@ -678,23 +730,37 @@ def generate_background(bid, path, description="", variant_seed=None):
 
 
 # ------------------------------------------------------------------ tự động bổ sung
-def ensure_assets(assets, bible, scenes):
+def ensure_assets(assets, bible, scenes, background_dir=None):
     assets = Path(assets)
     cast_path = assets / "cast.json"
     cast = json.loads(cast_path.read_text(encoding="utf-8")) if cast_path.exists() else {}
-    genders = {c["id"]: c.get("gender", "") for c in (bible or {}).get("characters", [])}
+    character_specs = {c["id"]: c for c in (bible or {}).get("characters", [])}
+    genders = {cid: c.get("gender", "") for cid, c in character_specs.items()}
     chars = {c for s in scenes for c in s.get("characters", [])}
     chars |= {s["speaker"] for s in scenes if s["speaker"] != "narrator"}
     for c in sorted(chars):
         folder = assets / "characters" / c
-        if not (folder / "neutral.png").exists():
+        override = cast.get(c) or character_specs.get(c) or {}
+        marker = folder / "generated.json"
+        stale = False
+        if marker.exists():
+            previous = json.loads(marker.read_text(encoding="utf-8"))
+            stale = previous.get("age") != age_of(override) or previous.get("kind") != override.get("kind", "human") or previous.get("version") != "child-age-v2"
+        if not (folder / "neutral.png").exists() or stale:
             print(f"  [asset] tạo nhân vật: {c}")
-            generate_character_set(c, genders.get(c, ""), folder, cast.get(c))
+            generate_character_set(c, genders.get(c, ""), folder, cast.get(c) or character_specs.get(c))
+    descriptions = {b["id"]: b.get("description", "") for b in (bible or {}).get("backgrounds", [])}
     for bg in sorted({s["background"] for s in scenes}):
-        p = assets / "backgrounds" / f"{bg}.png"
+        p = Path(background_dir or assets / "backgrounds") / f"{bg}.png"
         if not p.exists():
             print(f"  [asset] tạo nền: {bg}")
-            generate_background(bg, p)
+            original = assets / "backgrounds" / f"{bg}.png"
+            if background_dir and original.exists():
+                import shutil
+                p.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(original, p)
+            else:
+                generate_background(bg, p, descriptions.get(bg, ""))
 
 
 if __name__ == "__main__":

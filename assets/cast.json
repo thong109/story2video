@@ -1,1 +1,32 @@
-{}
+{
+  "tu": {
+    "name": "Tú",
+    "gender": "nam",
+    "age": 9,
+    "skin": "#c68660",
+    "hair": "#3c281e",
+    "shirt": "#b44646",
+    "style": "short",
+    "description": "",
+    "job": "none",
+    "kind": "ghost",
+    "pose": "standing",
+    "fem": false,
+    "pants": "#323c5a",
+    "glasses": true,
+    "freckles": false
+  },
+  "xac_chet": {
+    "name": "Xác chết",
+    "gender": "nữ",
+    "age": 25,
+    "skin": "#b8bdb6",
+    "hair": "#1e1e23",
+    "shirt": "#4670aa",
+    "style": "long",
+    "description": "",
+    "job": "none",
+    "kind": "corpse",
+    "pose": "lying_right"
+  }
+}

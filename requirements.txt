@@ -1,4 +1,7 @@
 anthropic
+flask
 edge-tts
 pillow
 numpy
+piper-tts
+imageio-ffmpeg

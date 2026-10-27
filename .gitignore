@@ -2,3 +2,7 @@ local_settings.json
 local_settings.tmp
 __pycache__
 build
+projects/
+models/voices/*.onnx
+models/image-cache/
+models/sd15-openvino/

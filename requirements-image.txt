@@ -1,0 +1,4 @@
+diffusers>=0.34,<1
+optimum-intel[openvino]>=1.25,<2
+transformers>=4.45,<5
+torch

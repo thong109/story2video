@@ -1,40 +1,54 @@
-story2video - Truyen -> video hoat hinh 2D (nhan vat, nen, giong doc, phu de: tu dong het)
+STORY STUDIO — TRUYỆN THÀNH VIDEO 2D
 
-CAI DAT
-  pip install -r requirements.txt     (can ffmpeg + bien moi truong ANTHROPIC_API_KEY cho buoc 1)
+Cài đặt: python -m pip install -r requirements.txt
+Ứng dụng ưu tiên FFmpeg ổn định đi kèm imageio-ffmpeg; cài bằng requirements.txt.
+Chạy: python app.py — mở http://127.0.0.1:5000
 
-THU NGAY (khong can API key)
-  python make_video.py demo_storyboard.json   -> video.mp4 (can Internet de edge-tts doc giong)
+DỰ ÁN
+Mỗi dự án lưu trong projects/<id>/:
+  project.json     tên và nội dung truyện
+  storyboard.json cảnh và nhân vật
+  build/          âm thanh, các cảnh video tạm
+  video.mp4       video hoàn chỉnh
+Chọn Dự án đã lưu để mở lại; chọn Dự án mới để bắt đầu truyện khác.
 
-  Truyen mau: truyen_mau.txt + storyboard_truyen_mau.json (18 canh)
-  python make_video.py storyboard_truyen_mau.json
+GIỌNG ĐỌC
+Chọn giọng kể, giọng nhân vật mặc định và voice riêng từng nhân vật.
+Piper dùng lại models ở ../tool/models/voices; có thể đổi bằng STORY_VOICE_MODELS.
+Giọng kể truyện ma: narrator_profile trong config.json.
 
-DUNG VOI TRUYEN CUA BAN
-  1. Dat truyen vao truyen.txt
-  2. python storyboard.py truyen.txt   -> storyboard.json (+ bao cac cau co the bi sot/sua)
-  3. Mo storyboard.json xem/sua tay neu can
-  4. Dien ten nhan vat -> giong trong config.json (mac dinh: narrator = nam, con lai = nu)
-  5. python make_video.py              -> video.mp4
-     Nhan vat/nen chua co se duoc TU VE (7 bieu cam x mieng dong/mo).
+STORYBOARD
+Không có API: nhận diện lời thoại có tên hoặc câu dẫn rõ người nói.
+Có thể sửa người nói và bối cảnh cho mỗi cảnh trước khi xuất video.
+Cấu hình AI trong giao diện; API key lưu ở local_settings.json.
 
-TUY CHINH
-  - assets/cast.json : doi ngoai hinh (mau da/toc/ao/quan, kieu toc, gioi tinh) cho tung nhan vat
-  - Dung hinh rieng : bo PNG nen trong suot vao assets/characters/<id>/neutral.png (+ <emotion>.png, <emotion>_talk.png)
-                      va assets/backgrounds/<id>.png -> se duoc uu tien thay cho hinh tu ve
-  - Xoa assets/characters/<id>/ de ve lai nhan vat do
-  - config.json : kich thuoc, fps, font, toc do doc (rate), giong doc
-  - Giong doc tieng Viet (edge-tts): vi-VN-HoaiMyNeural (nu), vi-VN-NamMinhNeural (nam)
+PHỤ ĐỀ
+Chọn font và cỡ chữ 16–96 px trong Thiết lập video, xem trước rồi Lưu thiết lập phụ đề.
+Thiết lập được lưu theo dự án và áp dụng khi xuất video lại.
 
-STORYBOARD AI (tuy chon)
-  Anthropic: dat ANTHROPIC_API_KEY nhu truoc.
-  Meta Muse: PowerShell -> $env:MODEL_API_KEY = "API_KEY_CUA_BAN"
-             sau do chay python app.py; mac dinh dung muse-spark-1.3.
-  Hoac dung MUSE_API_KEY thay cho MODEL_API_KEY. Khong ghi key truc tiep vao ma nguon.
+BỐI CẢNH THEO TRUYỆN
+Storyboard offline chọn địa điểm và thời điểm từ nội dung, giữ nền trong các lượt thoại liên tiếp.
+Dự án cũ: bấm Khớp bối cảnh theo truyện; xem ảnh nền, sửa mô tả ở từng cảnh rồi xuất video lại.
+Ảnh nền riêng lưu trong projects/<id>/backgrounds.
 
-CAI DAT API TRONG GIAO DIEN
-  Mo tab Cai dat AI, chon Meta Muse hoac Anthropic, dan API key roi bam Luu API key.
-  Bam Kiem tra ket noi de xac nhan. Key duoc luu trong local_settings.json (da them vao .gitignore).
+BACKGROUND AI LOCAL
+Đã bật Stable Diffusion 1.5/OpenVINO trong config.json (backgrounds.provider=local_ai).
+Bấm Tạo nền AI local để xem trước; xuất video tự tạo các nền còn thiếu.
+Ảnh AI lưu tại projects/<id>/backgrounds/*.ai.png; dùng lại khi mô tả không đổi.
+Bản model tương thích models/sd15-openvino dùng chung trọng số với model có sẵn, không sửa model gốc.
+Cache tạo ảnh nằm trên ổ dự án trong models/image-cache.
 
+NHÂN VẬT MA VÀ TƯ THẾ NẰM
+Tab Nhân vật: chọn Ma hoặc Thi thể, chọn tư thế đứng/nằm đầu trái/nằm đầu phải.
+Storyboard: mở Nhân vật xuất hiện để chọn nhân vật trong cảnh và đổi tư thế riêng cho cảnh.
+Thi thể giữ mắt nhắm và không nhép miệng.
 
-Ollama (local, khong can API key): tai Ollama, chay `ollama pull qwen2.5:7b`, mo tab Cai dat AI, chon Ollama va nhap ten model da cai.
-Hugging Face: tab Cai dat AI, chon Hugging Face Inference, dan HF token co quyen Inference Providers; model mac dinh Qwen/Qwen2.5-7B-Instruct-1M:fastest. Credit Free hang thang co gioi han.
+NHẬN DIỆN NHÂN VẬT XUẤT HIỆN
+Bấm Nhận diện nhân vật theo câu văn để gợi ý người có mặt trong từng cảnh.
+Phân biệt người được nhắc đến với người xuất hiện; giọng ở đầu dây có thể để ngoài khung hình.
+Có thể sửa checkbox Nhân vật xuất hiện và Hiện người nói; đại từ mơ hồ cần kiểm tra thủ công.
+
+TỶ LỆ TRẺ EM
+Nhân vật dưới 12 tuổi có thân/tay/chân ngắn hơn và thấp hơn người lớn trong video.
+Chiều cao theo tuổi: 1–3: 50%, 4–6: 60%, 7–9: 68%, 10–11: 76%, từ 12: 100%.
+Giữ cùng mặt đất; áp dụng cả cho ma, thi thể và tư thế nằm.
