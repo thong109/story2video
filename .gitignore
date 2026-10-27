@@ -1,0 +1,4 @@
+local_settings.json
+local_settings.tmp
+__pycache__
+build
